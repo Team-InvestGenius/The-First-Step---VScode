@@ -3,3 +3,4 @@ requests
 websocket-client
 pandas
 mysql-connector-python
+schedule
