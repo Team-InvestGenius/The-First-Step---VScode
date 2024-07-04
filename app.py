@@ -1,20 +1,18 @@
 from flask import Flask, jsonify
-from flask_socketio import SocketIO
+import requests
 import websocket
 import json
 import pandas as pd
 from datetime import datetime
 import os
 import mysql.connector
-import schedule
-import time
 from threading import Thread
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")  # 모든 출처를 허용
 
 API_KEY = '4bdb7d969e8f4525be72a5572a9ab1d7'
-SYMBOLS = "AAPL"
+SYMBOLS = "EUR/USD,USD/JPY,BTC/USD"
+CSV_FILE = 'data/stock_data_test.csv'
 DB_CONFIG = {
     'user': 'root',
     'password': '12345',
@@ -22,19 +20,10 @@ DB_CONFIG = {
     'database': 'stock_data_db'
 }
 
-RECONNECT_ATTEMPTS = 2
-
-def get_csv_file():
-    today = datetime.now().strftime('%Y-%m-%d')
-    return f'data/stock_data_{today}.csv'
-
-def create_csv_file(file_path):
-    if not os.path.exists(file_path):
-        os.makedirs('data', exist_ok=True)
-        pd.DataFrame(columns=['symbol', 'price', 'timestamp']).to_csv(file_path, index=False)
-
-CSV_FILE = get_csv_file()
-create_csv_file(CSV_FILE)
+# CSV 파일이 없으면 생성합니다.
+if not os.path.exists(CSV_FILE):
+    os.makedirs('data', exist_ok=True)
+    pd.DataFrame(columns=['symbol', 'price', 'timestamp']).to_csv(CSV_FILE, index=False)
 
 def on_message(ws, message):
     msg = json.loads(message)
@@ -52,20 +41,9 @@ def on_error(ws, error):
     print(error)
 
 def on_close(ws, close_status_code, close_msg):
-    global reconnect_attempts
     print("WebSocket closed")
-    if reconnect_attempts < RECONNECT_ATTEMPTS:
-        reconnect_attempts += 1
-        print(f"Reconnecting... Attempt {reconnect_attempts}")
-        time.sleep(5)
-        start_websocket()
-    else:
-        print("Max reconnect attempts reached. Aggregating data.")
-        aggregate_daily_data()
 
 def on_open(ws):
-    global reconnect_attempts
-    reconnect_attempts = 0
     subscribe_message = {
         "action": "subscribe",
         "params": {
@@ -83,8 +61,6 @@ def start_websocket():
     ws.run_forever()
 
 def aggregate_daily_data():
-    global CSV_FILE
-    
     if not os.path.exists(CSV_FILE):
         return
     
@@ -113,16 +89,6 @@ def aggregate_daily_data():
     cursor.close()
     conn.close()
 
-    new_csv_file = get_csv_file()
-    CSV_FILE = new_csv_file
-    create_csv_file(CSV_FILE)
-
-def schedule_aggregation():
-    schedule.every().day.at("23:59:59").do(aggregate_daily_data)
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
 @app.route('/')
 def index():
     return jsonify({"status": "running", "data_file": CSV_FILE})
@@ -133,11 +99,6 @@ def aggregate():
     return jsonify({"status": "aggregated"})
 
 if __name__ == "__main__":
-    reconnect_attempts = 0
     websocket_thread = Thread(target=start_websocket)
     websocket_thread.start()
-    
-    schedule_thread = Thread(target=schedule_aggregation)
-    schedule_thread.start()
-    
-    socketio.run(app, debug=True, use_reloader=False)
+    app.run(debug=True, use_reloader=False)
