@@ -23,7 +23,7 @@ def append_to_csv(data, filename):
 
 # 사용자 설정
 apikey = "4bdb7d969e8f4525be72a5572a9ab1d7"  # 발급받은 API 키 입력
-symbols = ["005930:KRX"]  # 예시: 삼성전자, SK하이닉스
+symbols = ["000100:KRX"]  # 예시: 삼성전자
 filename = "realtime_stock_prices.csv"
 
 while True:
