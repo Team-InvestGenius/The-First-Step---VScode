@@ -4,6 +4,7 @@ import csv
 import time
 from datetime import datetime
 
+# real_time 으로 비트코인, 이더리움, 리플 가져오는 함수 
 def get_crypto_prices_in_krw(crypto_ids, api_key):
     url = 'https://api.coingecko.com/api/v3/simple/price'
     headers = {
@@ -17,6 +18,7 @@ def get_crypto_prices_in_krw(crypto_ids, api_key):
     response = requests.get(url, headers=headers, params=params)
     return response.json()
 
+# csv 파일에 10분에 한번씩 업데이트
 def write_to_csv(data, filename='./data/crypto_data.csv'):
     fieldnames = ['timestamp', 'crypto', 'price_krw']
     file_exists = os.path.isfile(filename)

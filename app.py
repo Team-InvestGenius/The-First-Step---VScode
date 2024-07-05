@@ -25,6 +25,7 @@ if not os.path.exists(CSV_FILE):
     os.makedirs('data', exist_ok=True)
     pd.DataFrame(columns=['symbol', 'price', 'timestamp']).to_csv(CSV_FILE, index=False)
 
+# 콘솔에 로드되는 데이터 출력
 def on_message(ws, message):
     msg = json.loads(message)
     if 'price' in msg:
@@ -37,12 +38,15 @@ def on_message(ws, message):
         df = pd.DataFrame([record])
         df.to_csv(CSV_FILE, mode='a', header=False, index=False)
 
+# 에러 발생시 콘솔에 출력
 def on_error(ws, error):
     print(error)
 
+# 웹소켓이 닫힐 경우 콘솔에 출력
 def on_close(ws, close_status_code, close_msg):
     print("WebSocket closed")
 
+# 웹소켓이 다시 시작될 경우 콘솔에 출력
 def on_open(ws):
     subscribe_message = {
         "action": "subscribe",
@@ -52,6 +56,7 @@ def on_open(ws):
     }
     ws.send(json.dumps(subscribe_message))
 
+# 웹소켓 Reconnection 시도를 위한 함수  
 def start_websocket():
     ws = websocket.WebSocketApp(f"wss://ws.twelvedata.com/v1/quotes/price?apikey={API_KEY}",
                                 on_message=on_message,
@@ -60,6 +65,7 @@ def start_websocket():
     ws.on_open = on_open
     ws.run_forever()
 
+# 일일 집계 함수
 def aggregate_daily_data():
     if not os.path.exists(CSV_FILE):
         return
