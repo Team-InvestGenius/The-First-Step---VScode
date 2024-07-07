@@ -235,3 +235,5 @@ TASKS.md
 .DS_Store
 
 /docs
+/data
+/data/*

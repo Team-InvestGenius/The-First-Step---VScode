@@ -1,60 +1,81 @@
-import os
 import time
-from datetime import datetime, timedelta
-from typing import Optional
 import pandas as pd
-from modules.data.twelve_data import TwelveData
+from typing import Optional
+from datetime import datetime, timedelta
+from modules.data.core import DataProvider
+from modules.data.core import DataPipeline
 
 
-class DataPipeline:
-    def __init__(self, twelve_data: TwelveData, symbol: str, interval: str, country: str = "US",
-                 exchange: Optional[str] = None):
-        self.twelve_data = twelve_data
-        self.symbol = symbol
-        self.interval = interval
-        self.country = country
-        self.exchange = exchange
-        self.data = pd.DataFrame()
+class ProviderDataPipeline(DataPipeline):
+    def __init__(
+        self,
+        data_provider: DataProvider,
+        base_path: str,
+        use_file_lock: bool = True,
+        cache_days: int = 7,
+        fetch_interval: int = 60,
+        chunk_size: int = 10000,
+    ):
+        """
+        실시간 데이터 파이프라인 초기화
+        :param data_provider: 데이터 제공자 객체
+        :param base_path: 데이터를 저장할 기본 경로
+        :param use_file_lock: 파일 잠금 사용 여부
+        :param cache_days: 메모리에 캐시할 날짜 수
+        :param fetch_interval: 데이터 가져오기 간격 (초)
+        :param chunk_size: 데이터를 저장할 청크 크기
+        """
+        super().__init__(data_provider, base_path, use_file_lock, cache_days)
+        self.fetch_interval = fetch_interval
+        self.chunk_size = chunk_size
+        self._current_date = pd.Timestamp.now(tz="UTC").date()
 
-    def fetch_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None):
-        df = self.twelve_data.get_data(
-            symbol=self.symbol,
-            interval=self.interval,
-            start_date=start_date,
-            end_date=end_date,
-            country=self.country,
-            exchange=self.exchange
-        )
-        if df is not None and not df.empty:
-            self.data = pd.concat([self.data, df]).drop_duplicates().sort_index()
-        return df
+    def fetch_data(self, **kwargs) -> pd.DataFrame:
+        """새로운 데이터를 가져와 저장하고 캐시를 업데이트합니다."""
+        if self.data_provider is None:
+            return pd.DataFrame()
 
-    def fetch_start(self, days: int = 30):
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        return self.fetch_data(start_date=start_date, end_date=end_date)
+        self._cached_data = self.get_all_data()
+        new_data = self.data_provider.get_data()
 
-    def fetch_end(self, last_date: Optional[str] = None):
-        if last_date is None and not self.data.empty:
-            last_date = self.data.index[-1].strftime("%Y-%m-%d")
-        elif last_date is None:
-            raise ValueError("마지막 날짜를 지정하거나 데이터를 먼저 가져와야 합니다.")
+        if not new_data.empty:
+            new_data["date"] = pd.to_datetime(new_data.index, utc=True)
+            new_data = new_data.set_index("date")
 
-        return self.fetch_data(start_date=last_date)
+            if not self._cached_data.empty:
+                last_date = self._cached_data.index.max()
+                new_data = new_data[new_data.index > last_date]
 
-    def continuous_fetch(self, interval_seconds: int = 300):
+            if not new_data.empty:
+                self._save_data(new_data)
+                self._cached_data = pd.concat([self._cached_data, new_data]).sort_index()
+                cutoff_date = pd.Timestamp.now(tz="UTC") - timedelta(days=self.cache_days)
+                self._cached_data = self._cached_data.loc[self._cached_data.index >= cutoff_date]
+
+        return new_data
+
+    def fetch_and_save_realtime(self):
+        """실시간으로 데이터를 가져와 저장합니다."""
         while True:
-            print(f"{datetime.now()}: 데이터 가져오는 중...")
-            self.fetch_end()
-            self.save_data()
-            time.sleep(interval_seconds)
+            current_date = pd.Timestamp.now(tz="UTC").date()
+            if current_date != self._current_date:
+                print(f"날짜가 바뀌었습니다. 새로운 폴더에 데이터를 저장합니다: {current_date}")
+                self._current_date = current_date
 
-    def save_data(self, filename: Optional[str] = None):
-        if filename is None:
-            filename = f"{self.symbol}_{self.interval}_data.csv"
-        self.twelve_data.save_to_csv(self.data, filename)
+            new_data = self.fetch_data()
 
-    def print_latest_data(self, rows: int = 10):
-        self.twelve_data.print_data(self.data.tail(rows))
+            if not new_data.empty:
+                self._save_data(new_data)
+                print(f"새로운 데이터 {len(new_data)}행이 저장되었습니다.")
+            else:
+                print("새로운 데이터가 없습니다.")
 
+            time.sleep(self.fetch_interval)
 
+    def fetch_start(self, **kwargs):
+        """데이터 가져오기를 시작합니다."""
+        self._cached_data = self.get_all_data()
+        if self._cached_data.empty:
+            self._cached_data = self.data_provider.get_data()
+        else:
+            self.data_provider.start_date = self._cached_data.index.max()
