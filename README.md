@@ -19,3 +19,8 @@ LLM 기반의 투자유형 추천 시스템
 
 ## Strategy
 - TBD 
+
+### insert_yahoo_data_to_db.py
+- 사용법
+  - pip install pymysql 먼저하기
+  - python insert_yahoo_data_to_db.py 를 통해 DB로 저장
