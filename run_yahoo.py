@@ -1,8 +1,9 @@
-import concurrent.futures
-import configparser
-import pandas as pd
-from typing import List
 import os
+import threading
+import concurrent.futures
+import time
+import configparser
+from typing import List
 from modules.data.yahoo_finance import YahooFinance
 from modules.data.data_pipeline import ProviderDataPipeline
 
@@ -32,29 +33,48 @@ def create_data_providers(config: dict) -> List[YahooFinance]:
 
 
 def main(config_path: str, base_path: str):
-    """
-    메인 함수로, 설정 파일을 읽어 데이터 수집 파이프라인을 실행합니다.
-    :param config_path: 설정 파일 경로
-    :param base_path: 데이터를 저장할 기본 경로
-    """
-    # 설정 파일 읽기
     config = read_config(config_path)
     data_providers = create_data_providers(config)
 
-    # 스레드 풀을 사용하여 데이터 수집 병렬 처리
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    # 모든 주식을 한 번씩 가져오기
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(data_providers)) as executor:
         futures = []
         for provider in data_providers:
             symbol_base_path = os.path.join(base_path, provider.symbol)
             pipeline = ProviderDataPipeline(data_provider=provider, base_path=symbol_base_path)
-            futures.append(executor.submit(pipeline.fetch_and_save_realtime))
+            futures.append(executor.submit(pipeline.fetch_and_save_realtime, threading.Event(), True))
 
-        # 완료된 작업 처리
         for future in concurrent.futures.as_completed(futures):
             try:
                 future.result()
             except Exception as exc:
-                print(f'Generated an exception: {exc}')
+                print(f'Initial fetch generated an exception: {exc}')
+
+    print("Initial fetch for all stocks completed.")
+
+    # 계속해서 데이터 업데이트
+    stop_event = threading.Event()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(data_providers)) as executor:
+        futures = []
+        for provider in data_providers:
+            symbol_base_path = os.path.join(base_path, provider.symbol)
+            pipeline = ProviderDataPipeline(data_provider=provider, base_path=symbol_base_path)
+            futures.append(executor.submit(pipeline.fetch_and_save_realtime, stop_event))
+
+        try:
+            while True:
+                time.sleep(1)  # 메인 스레드가 CPU를 과도하게 사용하지 않도록 함
+        except KeyboardInterrupt:
+            print("Stopping all tasks...")
+            stop_event.set()
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            except Exception as exc:
+                print(f'Continuous fetch generated an exception: {exc}')
+
+    print("All tasks completed.")
 
 
 if __name__ == "__main__":
