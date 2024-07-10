@@ -2,6 +2,7 @@ import os
 import threading
 import concurrent.futures
 import time
+from datetime import datetime
 import configparser
 from typing import List
 from modules.data.yahoo_finance import YahooFinance
@@ -25,10 +26,19 @@ def create_data_providers(config: dict) -> List[YahooFinance]:
     :param config: 설정 정보 딕셔너리
     :return: 데이터 제공자 객체 리스트
     """
+    today_str = datetime.now().strftime('%Y-%m-%d')
     providers = []
     for section in config.sections():
         symbol = config[section]['symbol']
-        providers.append(YahooFinance(symbol=symbol, interval="1d", period="max"))
+        interval = config[section].get('interval', '1d')
+        period = config[section].get('period', '1mo')
+        start_date = config[section].get('start_date')
+        end_date = config[section].get('end_date')
+        
+        if end_date == 'TODAY':
+            end_date = today_str
+        
+        providers.append(YahooFinance(symbol=symbol, interval=interval, period=period, start_date=start_date, end_date=end_date))
     return providers
 
 
