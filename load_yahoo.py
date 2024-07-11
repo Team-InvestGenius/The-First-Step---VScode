@@ -56,5 +56,6 @@ if __name__ == "__main__":
         days_back = None  # 과거 30일간의 데이터를 로드
 
         data = load_data(base_path, symbol, days_back)
+        # drop_duplicates(keep="last") 해줘야함
         if data is not None:
             print(f"Data for {symbol}:\n", data.tail(5))
