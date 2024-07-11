@@ -1,14 +1,18 @@
-from flask import Flask, request, jsonify
+import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from langchain.llms import OpenAI
-import os
+from flask import Flask, request, jsonify
+from modules.llm.openai import GPTModel
+import tempfile
+
 
 app = Flask(__name__)
 
-# OpenAI API 키 설정
-key = "APIKEY"   # 나중에 암호화 해야함
-os.environ["OPENAI_API_KEY"] = key
+# 시스템 환경 변수에 OPENAI_API_KEY 를 등록할것!
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if not openai_api_key:
+    raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
+
 
 # LLaMA-3 모델 로드
 llama_model_id = 'MLP-KTLim/llama-3-Korean-Bllossom-8B'
@@ -16,8 +20,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 llama_tokenizer = AutoTokenizer.from_pretrained(llama_model_id)
 llama_model = AutoModelForCausalLM.from_pretrained(llama_model_id, torch_dtype=torch.bfloat16).to(device)
 
-# GPT-4 모델 로드
-gpt_4_model = OpenAI(model="gpt-4")
+# GPT-3.5 모델
+gpt_model = GPTModel(api_key=openai_api_key, model_id="gpt-3.5-turbo")
+
 
 # LLaMA-3 응답 생성 함수
 def generate_llama_response(instruction):
@@ -31,10 +36,6 @@ def generate_llama_response(instruction):
     response = llama_tokenizer.decode(outputs[0][input_ids.shape[-1]:], skip_special_tokens=True)
     return response
 
-# GPT-4 응답 생성 함수
-def generate_gpt4_response(instruction):
-    response = gpt_4_model.generate(instruction)
-    return response
 
 @app.route('/generate_llama', methods=['POST'])
 def generate_llama():
@@ -47,16 +48,76 @@ def generate_llama():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/generate_gpt4', methods=['POST'])
-def generate_gpt4():
+
+@app.route('/generate', methods=['POST'])
+def generate():
+    """
+    텍스트 생성 API 엔드포인트
+    """
     try:
         instruction = request.json.get('instruction')
         if not instruction:
-            return jsonify({'error': 'No instruction provided'}), 400
-        response = generate_gpt4_response(instruction)
+            return jsonify({'error': '지시사항이 제공되지 않았습니다'}), 400
+
+        response = gpt_model.generate(instruction)
         return jsonify({'response': response})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/fine-tune', methods=['POST'])
+def fine_tune():
+    """
+    Fine-tuning 시작 API 엔드포인트
+    """
+    try:
+        training_file = request.files.get('file')
+        if not training_file:
+            return jsonify({'error': '훈련 파일이 제공되지 않았습니다'}), 400
+
+        # 임시 파일 사용
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jsonl') as tmp:
+            training_file.save(tmp.name)
+            job_id, status = gpt_model.fine_tune(tmp.name)
+
+        # 임시 파일 삭제
+        os.unlink(tmp.name)
+
+        return jsonify({'job_id': job_id, 'status': status})
+    except Exception as e:
+        app.logger.error(f'Fine-tuning 시작 중 오류 발생: {str(e)}')
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/fine-tune-status', methods=['POST'])
+def fine_tune_status():
+    """
+    Fine-tuning 상태 확인 API 엔드포인트
+
+    사용방법 (예)
+    response = requests.post('http://your-api-url/fine-tune-status',
+                         json={'job_id': 'ft-AF1WoRqd3aJAHsqc9NY7iL8F'})
+    status = response.json()
+    """
+    try:
+        data = request.json
+        if not data or 'job_id' not in data:
+            return jsonify({'error': 'job_id가 제공되지 않았습니다'}), 400
+
+        job_id = data['job_id']
+
+        # job_id 형식 검증 (예: 'ft-'로 시작하는지)
+        if not job_id.startswith('ft-'):
+            return jsonify({'error': '유효하지 않은 job_id 형식입니다'}), 400
+
+        status = gpt_model.fine_tune_status(job_id)
+        return jsonify(status)
+    except ValueError as ve:
+        return jsonify({'error': f'잘못된 요청: {str(ve)}'}), 400
+    except Exception as e:
+        app.logger.error(f'Fine-tune 상태 확인 중 오류 발생: {str(e)}')
+        return jsonify({'error': '서버 내부 오류가 발생했습니다'}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=30000)
