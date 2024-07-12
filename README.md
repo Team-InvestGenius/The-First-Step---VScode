@@ -43,3 +43,4 @@ LLM 기반의 투자유형 추천 시스템
   - stretegypool : backtest list of strategies class and output best set of strategies at time T 
 
 
+    
