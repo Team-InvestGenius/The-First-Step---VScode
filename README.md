@@ -1,10 +1,10 @@
 # The-First-Step
 LLM 기반의 투자유형 추천 시스템
 
-## Data Pipelines
+## 1. Data Pipelines
 
 ### twelveData
-- 사용법 
+- Not Implemented yet.  
   - TBD 
 
 ### Yahoo Finance
@@ -23,13 +23,23 @@ LLM 기반의 투자유형 추천 시스템
   - _python run_fdr_korea.py 
   - _python load_fdr_korea.py 
 
-## LLM 
-- TBD
-
-## Strategy
-- TBD 
 
 ### insert_yahoo_data_to_db.py
 - 사용법
   - pip install pymysql 먼저하기
   - python insert_yahoo_data_to_db.py 를 통해 DB로 저장
+
+
+
+## 2. LLM 
+- TBD
+
+
+
+## 3. Trading Strategy
+- Key concepts
+  - algo : fit (train model), predict
+  - strategy : input DataPipeline, Algo  -> execute 
+  - stretegypool : backtest list of strategies class and output best set of strategies at time T 
+
+
