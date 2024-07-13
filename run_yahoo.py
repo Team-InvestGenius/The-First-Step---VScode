@@ -88,6 +88,14 @@ def main(config_path: str, base_path: str):
 
 
 if __name__ == "__main__":
+
+    from modules.utils import read_config, create_pipelines
+
     config_path = 'configs/yahoo_config.ini'
     base_path = 'data'
-    main(config_path, base_path)
+
+    configs = read_config(config_path)
+    dps = create_pipelines(configs, base_path)
+    for dp in dps:
+        dp.update_to_latest()
+

@@ -2,6 +2,8 @@ from abc import ABCMeta, abstractmethod
 import os
 import pandas as pd
 from typing import Optional
+from typing import Dict
+from typing import Any
 from datetime import datetime, timedelta
 from filelock import FileLock
 from contextlib import nullcontext
@@ -43,7 +45,7 @@ class DataProvider(metaclass=ABCMeta):
 class DataPipeline(metaclass=ABCMeta):
     def __init__(
         self,
-        data_provider: Optional["DataProvider"],
+        data_provider: DataProvider,
         base_path: str,
         use_file_lock: bool = True,
         cache_days: int = 7,
@@ -56,6 +58,14 @@ class DataPipeline(metaclass=ABCMeta):
         self._cached_data = (
             self._load_cache() if data_provider is None else pd.DataFrame()
         )
+
+    def get_params(self) -> Dict[str, Any]:
+        return {
+            "data_provider": self.data_provider if self.data_provider else "None",
+            "base_path": self.base_path,
+            "use_file_lock": self.use_file_lock,
+            "cache_days": self.cache_days,
+        }
 
     @abstractmethod
     def fetch_data(self, **kwargs) -> pd.DataFrame:
@@ -166,6 +176,34 @@ class DataPipeline(metaclass=ABCMeta):
                 except ValueError:
                     continue  # 날짜 형식이 아닌 디렉토리는 무시
 
+    def get_latest_date(self) -> Optional[datetime.date]:
+        """get latest date in each symbol"""
+        all_data = self.get_all_data()
+        if not all_data.empty:
+            return all_data.index.max().date()
+        return None
+
+    def update_to_latest(self):
+        """각 날짜별로 최신 데이터로 업데이트합니다."""
+        print("update")
+        if self.data_provider is None:
+            print("데이터 제공자가 설정되지 않았습니다.")
+            return
+
+        latest_date = self.get_latest_date()
+        if latest_date is None:
+            print("데이터가 없습니다. 전체 데이터를 가져옵니다.")
+            self.fetch_data()
+        else:
+            current_date = pd.Timestamp.now(tz="UTC").date()
+            while latest_date < current_date:
+                latest_date += timedelta(days=1)
+                self.data_provider.start_date = latest_date
+                new_data = self.fetch_data()
+                if new_data.empty:
+                    break
+                print(f"{latest_date} 데이터를 업데이트했습니다.")
+
     def save(self):
         self._save_data(self._cached_data)
 
@@ -173,3 +211,4 @@ class DataPipeline(metaclass=ABCMeta):
         end_date = pd.Timestamp.now(tz="UTC").date()
         start_date = end_date - timedelta(days=days_back)
         return self.get_data_range(start_date, end_date)
+

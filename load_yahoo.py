@@ -5,17 +5,6 @@ from modules.data.data_pipeline import ProviderDataPipeline
 import configparser
 
 
-def read_config(config_path: str) -> dict:
-    """
-    설정 파일을 읽어 설정 정보를 반환합니다.
-    :param config_path: 설정 파일 경로
-    :return: 설정 정보를 담은 딕셔너리
-    """
-    config = configparser.ConfigParser()
-    config.read(config_path)
-    return config
-
-
 def load_data(base_path: str, symbol: str, days_back: Optional[int] = None) -> Optional[pd.DataFrame]:
     """
     저장된 데이터를 메모리에 로드합니다.
@@ -25,7 +14,9 @@ def load_data(base_path: str, symbol: str, days_back: Optional[int] = None) -> O
     :return: 로드된 데이터프레임 (없으면 None 반환)
     """
     symbol_base_path = os.path.join(base_path, symbol)
-    pipeline = ProviderDataPipeline(data_provider=None, base_path=symbol_base_path, use_file_lock=True)
+    pipeline = ProviderDataPipeline(data_provider=None,
+                                    base_path=symbol_base_path,
+                                    use_file_lock=True)
 
     if not os.path.exists(symbol_base_path):
         print(f"No data directory for symbol: {symbol}")
@@ -44,12 +35,12 @@ def load_data(base_path: str, symbol: str, days_back: Optional[int] = None) -> O
 
 
 if __name__ == "__main__":
+
     config_path = 'configs/yahoo_config.ini'
     base_path = 'data'
 
     # 설정 파일 읽기
     config = read_config(config_path)
-
     # 각 심볼에 대한 데이터 로드 및 출력
     for section in config.sections():
         symbol = config[section]['symbol']
