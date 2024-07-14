@@ -237,3 +237,5 @@ TASKS.md
 /docs
 /data
 /data/*
+/logs
+/logs/*

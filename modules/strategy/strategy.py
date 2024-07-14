@@ -6,7 +6,7 @@ from modules.algo.core import ValueBasedAlgo
 from modules.strategy.core import ValueBasedStrategy
 
 
-class Strategy(ValueBasedStrategy):
+class MomentumStrategy(ValueBasedStrategy):
     def __init__(
         self,
         train_start_date: str,
@@ -88,3 +88,31 @@ class Strategy(ValueBasedStrategy):
             "selection_param": self.selection_param
         })
         return params
+
+
+
+if __name__ == "__main__":
+
+    from modules.utils import read_config
+    from modules.utils import create_yahoo_providers
+    from modules.utils import create_pipelines
+    from modules.algo.momentum import MomentumAlgo
+
+    config = read_config("../../configs/strategies/momentum_strategy.yaml")
+    pipelines = create_pipelines(config)
+
+    # 전략 초기화
+    from modules.algo.momentum import MomentumAlgo
+
+    algo = MomentumAlgo()
+
+    strategy = MomentumStrategy(
+        train_start_date=config['strategy']['train_start_date'],
+        train_end_date=config['strategy']['train_end_date'],
+        valid_start_date=config['strategy']['valid_start_date'],
+        valid_end_date=config['strategy']['valid_end_date'],
+        dps=pipelines,
+        algo=algo,
+        selection_method=config['strategy']['selection_method'],
+        selection_param=config['strategy']['selection_param'],
+    )

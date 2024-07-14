@@ -1,0 +1,32 @@
+strategy:
+  name: MomentumStrategy
+  train_start_date: "2020-01-01"
+  train_end_date: "2021-12-31"
+  valid_start_date: "2022-01-01"
+  valid_end_date: "2022-12-31"
+  selection_method: "top_n"
+  selection_param: 10
+
+data_pipelines:
+  base_path: "../data"
+  stocks_file: "yahoo_config.yaml"  # 외부 파일 경로 (옵션)
+  stocks:   # 내부에 직접 정의할 경우 (옵션)
+    - symbol: AAPL
+      full_name: Apple Inc.
+      exchange: NASDAQ
+    - symbol: MSFT
+      full_name: Microsoft Corporation
+      exchange: NASDAQ
+    - symbol: AMZN
+      full_name: Amazon.com Inc.
+      exchange: NASDAQ
+    - symbol: GOOGL
+      full_name: Alphabet Inc.
+      exchange: NASDAQ
+    - symbol: META
+      full_name: Meta Platforms Inc.
+      exchange: NASDAQ
+
+algorithm:
+  name: MomentumAlgo
+  # 알고리즘 관련 추가 설정들...
