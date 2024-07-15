@@ -131,7 +131,7 @@ class DataPipeline(metaclass=ABCMeta):
             for file in files
             if file.endswith(".csv")
         ]
-        return pd.concat(all_data).sort_index() if all_data else pd.DataFrame()
+        return pd.concat(all_data).sort_index().drop_duplicates(keep="last") if all_data else pd.DataFrame()
 
     def get_data_range(
         self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None

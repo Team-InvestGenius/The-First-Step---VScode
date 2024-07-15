@@ -44,8 +44,8 @@ def load_data(base_path: str, symbol: str, days_back: Optional[int] = None) -> O
 
 
 if __name__ == "__main__":
-    config_path = 'configs/yahoo_config.ini'
-    base_path = 'data'
+    config_path = 'configs/fdr_config.ini'
+    base_path = 'data/kor'
 
     # 설정 파일 읽기
     config = read_config(config_path)

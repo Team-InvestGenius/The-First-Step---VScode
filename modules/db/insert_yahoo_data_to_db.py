@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from mysql import DataBase, insert_yahoo_finance_data
+from aggregated_dataset_db import AggregatedDatasetDB
 
 def main(data_path: str, db_config: dict):
     """
@@ -10,7 +10,7 @@ def main(data_path: str, db_config: dict):
     :param db_config: 데이터베이스 설정 딕셔너리
     """
     # 데이터베이스 연결 설정
-    db = DataBase(
+    db = AggregatedDatasetDB(
         db_address=db_config['db_address'],
         user_id=db_config['user_id'],
         pw=db_config['pw'],
@@ -26,8 +26,9 @@ def main(data_path: str, db_config: dict):
                 file_path = os.path.join(symbol_path, file)
                 if file.endswith('.csv'):
                     data = pd.read_csv(file_path)
-                    insert_yahoo_finance_data(db, data, symbol)
+                    db.insert(data, symbol)
                     print(f"Data from {file} inserted into the database.")
+    db.close()
 
 if __name__ == "__main__":
     db_config = {
@@ -37,5 +38,5 @@ if __name__ == "__main__":
         'db_name': 'InvestGenius',
         'port': 3307
     }
-    data_path = '../../data'
+    data_path = os.path.join(os.path.dirname(__file__), '../../data')
     main(data_path, db_config)

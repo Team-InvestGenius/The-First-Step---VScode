@@ -54,9 +54,8 @@ class ProviderDataPipeline(DataPipeline):
 
         return new_data
 
-    def fetch_and_save_realtime(self):
-        """실시간으로 데이터를 가져와 저장합니다."""
-        while True:
+    def fetch_and_save_realtime(self, stop_event, single_fetch=False):
+        while not stop_event.is_set():
             current_date = pd.Timestamp.now(tz="UTC").date()
             if current_date != self._current_date:
                 print(f"날짜가 바뀌었습니다. 새로운 폴더에 데이터를 저장합니다: {current_date}")
@@ -66,9 +65,12 @@ class ProviderDataPipeline(DataPipeline):
 
             if not new_data.empty:
                 self._save_data(new_data)
-                print(f"새로운 데이터 {len(new_data)}행이 저장되었습니다.")
+                print(f"{self.data_provider.symbol}: 새로운 데이터 {len(new_data)}행이 저장되었습니다.")
             else:
-                print("새로운 데이터가 없습니다.")
+                print(f"{self.data_provider.symbol}: 새로운 데이터가 없습니다.")
+
+            if single_fetch:
+                break
 
             time.sleep(self.fetch_interval)
 
