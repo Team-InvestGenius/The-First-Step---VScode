@@ -19,7 +19,7 @@ class ValueBasedAlgo(ABC):
         pass
 
     @abstractmethod
-    def calculate_values(self, data: pd.DataFrame) -> pd.DataFrame:
+    def calculate_values(self, data: pd.DataFrame) -> pd.Series:
         """
         지표 값 계산 메서드
         :param data: 전처리된 데이터

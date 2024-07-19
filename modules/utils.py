@@ -155,17 +155,18 @@ def load_data(
 
 def process_data(
     dp: ProviderDataPipeline, n_days_before: Optional[int] = None
-) -> Optional[pd.DataFrame]:
-    logger.info(f"Processing data for symbol: {dp.data_provider.symbol}")
+) -> Optional[Dict[str, pd.DataFrame]]:
+    symbol = dp.data_provider.symbol
+    logger.info(f"Processing data for symbol: {symbol}")
     try:
         dp.update_to_latest()
         data = load_data(dp, n_days_before)
         if data is not None:
-            logger.info(f"Loaded data for {dp.data_provider.symbol}:")
+            logger.info(f"Loaded data for {symbol}:")
             logger.info(f"Shape: {data.shape}")
             logger.info(f"Date range: {data.index.min()} to {data.index.max()}")
             # 여기에 추가적인 데이터 처리 로직을 구현할 수 있습니다.
-        return data
+        return {symbol: data}
     except Exception as e:
         logger.error(f"Error processing data for symbol {dp.data_provider.symbol}: {e}")
         return None
@@ -192,7 +193,7 @@ def create_pipelines(
 
 def parallel_process(
     func: Callable, items: List[Any], n_days_before: Optional[int] = None
-) -> List[Any]:
+) -> List[Dict[str, pd.DataFrame]]:
     logger.info("Starting parallel processing")
     results = []
     with concurrent.futures.ThreadPoolExecutor(

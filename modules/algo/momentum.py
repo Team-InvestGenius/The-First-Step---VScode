@@ -13,7 +13,7 @@ class MomentumAlgo(ValueBasedAlgo):
         smoothed_data = data.rolling(window=self.window).mean()
         return smoothed_data.dropna()
 
-    def calculate_values(self, data: pd.DataFrame) -> pd.DataFrame:
+    def calculate_values(self, data: pd.DataFrame) -> pd.Series:
 
         def momentum(ts: np.ndarray) -> float:
             ts_normalized = (ts - np.mean(ts)) / np.std(ts)

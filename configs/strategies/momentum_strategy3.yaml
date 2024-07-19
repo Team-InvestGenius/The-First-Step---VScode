@@ -1,6 +1,6 @@
 strategy:
   name: MomentumStrategy
-  selection_method: "top_n"  #  "threshold", "relative", "top_n"
+  selection_method: "relative"  #  "threshold", "relative", "top_n"
   selection_param: 5
 
 algorithm:
