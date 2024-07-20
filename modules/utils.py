@@ -14,11 +14,13 @@ from modules.logger import get_logger
 logger = get_logger(__name__)
 
 # 상수 정의
-CONFIG_KEY_DATA_PIPELINES = "data_pipelines"
 CONFIG_KEY_STRATEGY = "strategy"
+CONFIG_KEY_ALGORITHM = "algorithm"
+CONFIG_KEY_DATA_PIPELINES = "data_pipelines"
+CONFIG_KEY_NAME = "name"
+
 CONFIG_KEY_STOCKS = "stocks"
 CONFIG_KEY_BASE_PATH = "base_path"
-CONFIG_KEY_PROVIDER_CLASS = "provider_class"
 CONFIG_KEY_STOCKS_FILE = "stocks_file"
 
 
@@ -50,31 +52,58 @@ def read_config(config_path: str) -> Dict[str, Any]:
 
     project_root = find_project_root(os.path.dirname(os.path.abspath(config_path)))
 
-    if CONFIG_KEY_DATA_PIPELINES not in config:
-        if (
-            CONFIG_KEY_STRATEGY in config
-            and CONFIG_KEY_DATA_PIPELINES in config[CONFIG_KEY_STRATEGY]
-        ):
-            data_pipelines = config[CONFIG_KEY_STRATEGY][CONFIG_KEY_DATA_PIPELINES]
-        else:
-            data_pipelines = {}
-    else:
-        data_pipelines = config[CONFIG_KEY_DATA_PIPELINES]
+    # 새로운 구조로 config 재구성
+    new_config = {
+        CONFIG_KEY_STRATEGY: {},
+        CONFIG_KEY_ALGORITHM: {},
+        CONFIG_KEY_DATA_PIPELINES: {},
+    }
 
-    if CONFIG_KEY_BASE_PATH in data_pipelines:
-        data_pipelines[CONFIG_KEY_BASE_PATH] = os.path.normpath(
-            os.path.join(project_root, data_pipelines[CONFIG_KEY_BASE_PATH])
+    # Strategy 정보 처리
+    if CONFIG_KEY_STRATEGY in config:
+        new_config[CONFIG_KEY_STRATEGY] = config[CONFIG_KEY_STRATEGY]
+        # Strategy 내의 data_pipelines 정보를 별도로 이동
+        if CONFIG_KEY_DATA_PIPELINES in new_config[CONFIG_KEY_STRATEGY]:
+            new_config[CONFIG_KEY_DATA_PIPELINES] = new_config[CONFIG_KEY_STRATEGY].pop(
+                CONFIG_KEY_DATA_PIPELINES
+            )
+
+    # Algorithm 정보 처리
+    if CONFIG_KEY_ALGORITHM in config:
+        new_config[CONFIG_KEY_ALGORITHM] = config[CONFIG_KEY_ALGORITHM]
+
+    # Data Pipelines 정보 처리
+    if CONFIG_KEY_DATA_PIPELINES in config:
+        new_config[CONFIG_KEY_DATA_PIPELINES] = config[CONFIG_KEY_DATA_PIPELINES]
+
+    # Data Pipelines 정보가 없는 경우 처리
+    if not new_config[CONFIG_KEY_DATA_PIPELINES]:
+        logger.warning("No data pipeline configuration found")
+        new_config[CONFIG_KEY_DATA_PIPELINES] = {}
+
+    # base_path 설정
+    if CONFIG_KEY_BASE_PATH in new_config[CONFIG_KEY_DATA_PIPELINES]:
+        new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_BASE_PATH] = os.path.normpath(
+            os.path.join(
+                project_root,
+                new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_BASE_PATH],
+            )
         )
     else:
-        data_pipelines[CONFIG_KEY_BASE_PATH] = os.path.join(project_root, "data")
+        new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_BASE_PATH] = os.path.join(
+            project_root, "data"
+        )
 
-    if CONFIG_KEY_STOCKS_FILE in data_pipelines:
-        stocks_file = data_pipelines[CONFIG_KEY_STOCKS_FILE]
+    # stocks_file 처리
+    if CONFIG_KEY_STOCKS_FILE in new_config[CONFIG_KEY_DATA_PIPELINES]:
+        stocks_file = new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_STOCKS_FILE]
         stocks_path = os.path.join(os.path.dirname(config_path), stocks_file)
         try:
             with open(stocks_path, "r") as file:
                 stocks_config = yaml.safe_load(file)
-            data_pipelines[CONFIG_KEY_STOCKS] = stocks_config[CONFIG_KEY_STOCKS]
+            new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_STOCKS] = stocks_config[
+                CONFIG_KEY_STOCKS
+            ]
         except FileNotFoundError:
             logger.warning(
                 f"Stocks file '{stocks_file}' not found. Using stocks defined in main config."
@@ -84,39 +113,51 @@ def read_config(config_path: str) -> Dict[str, Any]:
                 f"Invalid structure in stocks file '{stocks_file}'. Using stocks defined in main config."
             )
 
-    if CONFIG_KEY_STRATEGY in config:
-        config[CONFIG_KEY_STRATEGY][CONFIG_KEY_DATA_PIPELINES] = data_pipelines
-    else:
-        config[CONFIG_KEY_DATA_PIPELINES] = data_pipelines
-
     logger.info("Config processing completed")
-    return config
+    return new_config
 
 
-def create_data_providers(config: dict) -> List[DataProvider]:
+def load_module(config: Dict, type_key: str):
+    name = config[type_key]['name']
+    if 'module' in config[type_key]:
+        module_path = config[type_key]['module']
+    else:
+        # FIXME : 모듈 경로 직접 입력
+        raise NotImplemented
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, name)
+    except (ImportError, AttributeError) as e:
+        logger.error(f"Failed to import {type_key} {name}: {e}")
+        raise
+
+
+def create_data_providers(config: Dict[str, Any]) -> List[DataProvider]:
     logger.info("Creating data providers")
     data_pipelines = config[CONFIG_KEY_DATA_PIPELINES]
     stocks = data_pipelines[CONFIG_KEY_STOCKS]
 
-    provider_class_path = data_pipelines[CONFIG_KEY_PROVIDER_CLASS]
-    module_name, class_name = provider_class_path.rsplit(".", 1)
-    module = importlib.import_module(module_name)
-    provider_class = getattr(module, class_name)
+    if CONFIG_KEY_NAME not in data_pipelines:
+        logger.error(f"{CONFIG_KEY_NAME} not found in data_pipelines configuration")
+        raise ValueError(f"{CONFIG_KEY_NAME} must be specified in the configuration")
+
+    provider_name = data_pipelines[CONFIG_KEY_NAME]
+
+    try:
+        provider_class = load_module(config, CONFIG_KEY_DATA_PIPELINES)
+    except Exception as e:
+        logger.error(f"Failed to load provider {provider_name}: {e}")
+        raise
 
     logger.info(f"Using provider class: {provider_class.__name__}")
 
-    params = []
-    if provider_class.__name__ == "YahooFinance":
-        params.extend(["interval", "period", "start_date", "end_date"])
-    elif provider_class.__name__ == "FinanceDataReader":
-        params.extend(["interval", "start_date", "end_date"])
-
+    params = ["interval", "period", "start_date", "end_date"]
     providers = []
     for stock in stocks:
         symbol = stock["symbol"]
         provider_params = {
             k: stock.get(k) or data_pipelines.get(k)
-            for k in params
+            for k in params if k in stock or k in data_pipelines
         }
 
         if provider_params.get("end_date") == "TODAY":
@@ -172,9 +213,7 @@ def process_data(
         return None
 
 
-def create_pipelines(
-    config: dict, n_days_before: Optional[int] = None
-) -> List[ProviderDataPipeline]:
+def create_pipelines(config: Dict[str, Any]) -> List[ProviderDataPipeline]:
     logger.info("Creating data pipelines")
     providers = create_data_providers(config)
     base_path = config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_BASE_PATH]
@@ -215,26 +254,15 @@ def parallel_process(
     return results
 
 
-def run_data_pipeline(config_path: str, base_path: Optional[str] = None):
-    logger.info(f"Starting main function with config path: {config_path}")
-    config = read_config(config_path)
-    if base_path:
-        config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_BASE_PATH] = base_path
-    base_path = config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_BASE_PATH]
+def run_data_pipeline(config: Dict[str, Any]):
+    pipelines = create_pipelines(config)
 
-    data_providers = create_data_providers(config)
-    logger.info(f"Created {len(data_providers)} data providers")
+    logger.info(f"Created {len(pipelines)} data pipelines")
 
     logger.info("Starting initial fetch for all stocks")
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=len(data_providers)
-    ) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pipelines)) as executor:
         futures = []
-        for provider in data_providers:
-            symbol_base_path = os.path.join(base_path, provider.symbol)
-            pipeline = ProviderDataPipeline(
-                data_provider=provider, base_path=symbol_base_path
-            )
+        for pipeline in pipelines:
             futures.append(
                 executor.submit(
                     pipeline.fetch_and_save_realtime, threading.Event(), True
@@ -253,15 +281,9 @@ def run_data_pipeline(config_path: str, base_path: Optional[str] = None):
 
     logger.info("Starting continuous data update")
     stop_event = threading.Event()
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=len(data_providers)
-    ) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pipelines)) as executor:
         futures = []
-        for provider in data_providers:
-            symbol_base_path = os.path.join(base_path, provider.symbol)
-            pipeline = ProviderDataPipeline(
-                data_provider=provider, base_path=symbol_base_path
-            )
+        for pipeline in pipelines:
             futures.append(
                 executor.submit(pipeline.fetch_and_save_realtime, stop_event)
             )
@@ -282,3 +304,36 @@ def run_data_pipeline(config_path: str, base_path: Optional[str] = None):
                 )
 
     logger.info("All tasks completed.")
+
+
+def create_strategy(config: Dict[str, Any]):
+    algorithm_config = config.get(CONFIG_KEY_ALGORITHM, {})
+    strategy_config = config.get(CONFIG_KEY_STRATEGY, {})
+
+    if not strategy_config:
+        logger.warning("No strategy configuration found")
+        return None
+
+    try:
+        strategy_class = load_module(config, CONFIG_KEY_STRATEGY)
+    except Exception as e:
+        logger.error(f"Failed to load strategy: {e}")
+        return None
+
+    # Create data pipelines
+    data_pipelines = create_pipelines(config)    # List[DataPipelines]
+
+    # Create algorithm
+    algorithm = None
+    if algorithm_config:
+        try:
+            algorithm_class = load_module(config, CONFIG_KEY_ALGORITHM)
+            algorithm = algorithm_class(**algorithm_config["params"])
+        except Exception as e:
+            logger.error(f"Failed to load algorithm: {e}")
+
+    strategy_params = strategy_config["params"]
+    strategy_params['dps'] = data_pipelines
+    if algorithm:
+        strategy_params['algo'] = algorithm
+    return strategy_class(**strategy_params)

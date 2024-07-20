@@ -1,3 +1,19 @@
+strategy:
+  name: MomentumStrategy
+  module: "modules.strategy.strategy"
+  params:
+    train_period: 120
+    valid_period: 20   # Holding periods
+    selection_method: "relative"  #  "threshold", "relative", "top_n"
+    min_stocks: 3   # select stocks at least
+    max_stocks: 7  # select stocks maximum
+
+algorithm:
+  name: MomentumAlgo
+  module: "modules.algo.momentum"
+  params:
+    window: 20
+
 data_pipelines:
   name: FinanceDataReader
   module: "modules.data.fdr_korea"

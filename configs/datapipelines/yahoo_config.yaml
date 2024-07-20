@@ -1,5 +1,6 @@
 data_pipelines:
-  provider_class: "modules.data.yahoo_finance.YahooFinance"
+  name: YahooFinance
+  module: "modules.data.yahoo_finance"
   base_path: "data/USA"
   interval: "1d"
   period: "max"

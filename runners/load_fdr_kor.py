@@ -27,5 +27,7 @@ if __name__ == "__main__":
     )
     config = read_config(config_path)
     dps = create_pipelines(config)
-    result = parallel_process(process_data, dps, 30)  # list
+    result = parallel_process(process_data, dps)
+    print(result)
+
     logger.info("Script completed")
