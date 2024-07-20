@@ -1,7 +1,17 @@
-from typing import List
-# FIXME : Strategy 전체 클래스 ?
+import pytz
+from datetime import datetime
+from typing import List, Optional, Dict, Tuple, Union
 from modules.strategy.core import ValueBasedStrategy
-from modules.strategy.strategy import MomentumAlgo
+
+
+def filter_portfolios(portfolios: List[Tuple[Dict, ValueBasedStrategy]]) -> List[
+    Tuple[Dict, ValueBasedStrategy]]:
+    return [
+        (portfolio, strategy) for portfolio, strategy in portfolios
+        if portfolio['performance']['cumulative_return'] > 0
+           and portfolio['performance']['sharpe_ratio'] > 0
+        # additional filtering here
+    ]
 
 
 class StrategyPool:
@@ -9,72 +19,36 @@ class StrategyPool:
     def __init__(
             self,
             strategies: List[ValueBasedStrategy],
-            trading_preferences: str,
+            trading_preferences: Optional[str] = None,
     ):
-
         self.strategies = strategies
-        self.trading_preferences = trading_preferences
+        self.trading_preferences = trading_preferences or 'balanced'
 
-    def execute(self):
+    def execute(self, execute_date: datetime = None) -> Tuple[Dict, ValueBasedStrategy]:
+        if execute_date is None:
+            execute_date = datetime.now(tz=pytz.UTC)
 
+        portfolios = []
         for strategy in self.strategies:
-            strategy.execute()
+            portfolios.append((strategy.execute(execute_date), strategy))
 
+        return self.select_best_portfolio(portfolios)
 
+    def select_best_portfolio(self, portfolios: List[Tuple[Dict, ValueBasedStrategy]]) -> Union[
+        Tuple[Dict, ValueBasedStrategy], str]:
+        filtered_portfolios = filter_portfolios(portfolios)
 
-if __name__ == '__main__':
+        if not filtered_portfolios:
+            return "No suitable strategy found based on the given criteria."
 
-    config1 = read_config("../../configs/strategies/momentum_strategy1.yaml")
-    dp1 = create_pipelines(config1)
-
-    config2 = read_config("../../configs/strategies/momentum_strategy2.yaml")
-    dp2 = create_pipelines(config2)
-
-    config3 = read_config("../../configs/strategies/momentum_strategy3.yaml")
-    dp3 = create_pipelines(config3)
-
-    algo = MomentumAlgo()
-
-    strategy1 = MomentumStrategy(
-        train_start_date="2024-05-01",
-        train_end_date="2024-06-30",
-        valid_start_date="2024-07-01",
-        valid_end_date="2024-07-18",
-        dps=dp1,
-        algo=algo,
-        selection_method=config1["strategy"]["selection_method"],
-        selection_param=config1["strategy"]["selection_param"],
-    )
-
-    strategy2 = MomentumStrategy(
-        train_start_date="2024-05-01",
-        train_end_date="2024-06-30",
-        valid_start_date="2024-07-01",
-        valid_end_date="2024-07-18",
-        dps=dp2,
-        algo=algo,
-        selection_method=config1["strategy"]["selection_method"],
-        selection_param=config1["strategy"]["selection_param"],
-    )
-
-    strategy3 = MomentumStrategy(
-        train_start_date="2024-05-01",
-        train_end_date="2024-06-30",
-        valid_start_date="2024-07-01",
-        valid_end_date="2024-07-18",
-        dps=dp3,
-        algo=algo,
-        selection_method=config1["strategy"]["selection_method"],
-        selection_param=config1["strategy"]["selection_param"],
-    )
-
-    pool = StrategyPool(
-        strategies=[strategy1, strategy2, strategy3],
-        trading_preferences=config1["trading"]["trading_preferences"],
-    )
-
-    pool.execute()
-
-
-
+        if self.trading_preferences == 'aggressive':
+            return max(filtered_portfolios, key=lambda x: x[0]['performance']['cumulative_return'])
+        elif self.trading_preferences == 'conservative':
+            return min(filtered_portfolios, key=lambda x: x[0]['performance']['mdd'])
+        elif self.trading_preferences == 'sharp':
+            return max(filtered_portfolios, key=lambda x: x[0]['performance']['sharpe_ratio'])
+        elif self.trading_preferences == 'low_volatility':
+            return min(filtered_portfolios, key=lambda x: x[0]['performance']['annual_volatility'])
+        else:  # balanced (default)
+            return max(filtered_portfolios, key=lambda x: x[0]['performance']['sharpe_ratio'])
 

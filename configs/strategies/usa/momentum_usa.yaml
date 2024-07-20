@@ -1,13 +1,22 @@
 strategy:
   name: MomentumStrategy
-  selection_method: "top_n"  #  "threshold", "relative", "top_n"
-  selection_param: 5
+  module: "modules.strategy.strategy"
+  params:
+    train_period: 120
+    valid_period: 5   # Holding periods
+    selection_method: "top_n"  #  "threshold", "relative", "top_n"
+    selection_param: 5
+
 
 algorithm:
   name: MomentumAlgo
+  module: "modules.algo.momentum"
+  params:
+    window: 20
 
 data_pipelines:
-  provider_class: "modules.data.yahoo_finance.YahooFinance"
+  name: YahooFinance
+  module: "modules.data.yahoo_finance"
   base_path: "data/USA"
   interval: "1d"
   period: "max"

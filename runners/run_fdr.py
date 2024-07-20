@@ -28,11 +28,5 @@ if __name__ == "__main__":
 
     # config 파일 읽기
     config = read_config(config_path)
-
-    # provider_class가 설정되어 있지 않다면 YahooFinance로 설정
-    if 'provider_class' not in config['data_pipelines']:
-        config['data_pipelines']['provider_class'] = 'modules.data.fdr_korea.FinanceDataReader'
-        logger.info(f"Provider class set to: {config['data_pipelines']['provider_class']}")
-
-    run_data_pipeline(config_path)
+    run_data_pipeline(config)
     logger.info("Script completed")
