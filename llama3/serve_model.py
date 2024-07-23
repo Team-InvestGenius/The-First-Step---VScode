@@ -1,9 +1,9 @@
 import os
 import torch
+import tempfile
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from flask import Flask, request, jsonify
-from modules.llm.openai import GPTModel
-import tempfile
+from modules.llm.chat_gpt import GPTModel
 
 
 app = Flask(__name__)
