@@ -2,6 +2,21 @@ import os
 import pandas as pd
 from aggregated_dataset_db import AggregatedDatasetDB
 
+def batch_insert(db, data, symbol, batch_size=1000):
+    """
+    데이터를 배치로 나누어 데이터베이스에 삽입.
+    
+    :param db: 데이터베이스 연결 객체
+    :param data: 삽입할 데이터 DataFrame
+    :param symbol: 심볼 이름
+    :param batch_size: 배치 크기
+    """
+    for start in range(0, len(data), batch_size):
+        end = start + batch_size
+        batch_data = data.iloc[start:end]
+        db.insert(batch_data, symbol)
+        print(f"Inserted batch {start} to {end} for symbol {symbol}")
+
 def main(data_path: str, db_config: dict):
     """
     데이터 폴더 내의 모든 Yahoo Finance 데이터를 읽어 데이터베이스에 삽입.
@@ -19,15 +34,20 @@ def main(data_path: str, db_config: dict):
     )
 
     # 데이터 폴더 내의 모든 파일을 읽어 데이터베이스에 삽입
-    for symbol in os.listdir(data_path):
-        symbol_path = os.path.join(data_path, symbol)
-        if os.path.isdir(symbol_path):
-            for file in os.listdir(symbol_path):
-                file_path = os.path.join(symbol_path, file)
-                if file.endswith('.csv'):
-                    data = pd.read_csv(file_path)
-                    db.insert(data, symbol)
-                    print(f"Data from {file} inserted into the database.")
+    for country in ['KOR', 'USA']:
+        country_path = os.path.join(data_path, country)
+        if os.path.isdir(country_path):
+            for symbol in os.listdir(country_path):
+                symbol_path = os.path.join(country_path, symbol)
+                if os.path.isdir(symbol_path):
+                    for file in os.listdir(symbol_path):
+                        file_path = os.path.join(symbol_path, file)
+                        if file.endswith('.csv'):
+                            data = pd.read_csv(file_path)
+                            try:
+                                batch_insert(db, data, symbol)
+                            except Exception as e:
+                                print(f"Error inserting data from {file}: {e}")
     db.close()
 
 if __name__ == "__main__":

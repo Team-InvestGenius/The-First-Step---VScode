@@ -40,7 +40,7 @@ def find_project_root(current_path: str) -> str:
 def read_config(config_path: str) -> Dict[str, Any]:
     logger.info(f"Reading config file: {config_path}")
     try:
-        with open(config_path, "r") as file:
+        with open(config_path, "r", encoding='utf-8') as file:
             config = yaml.safe_load(file)
         logger.debug("Config file loaded successfully")
     except FileNotFoundError:
@@ -99,7 +99,7 @@ def read_config(config_path: str) -> Dict[str, Any]:
         stocks_file = new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_STOCKS_FILE]
         stocks_path = os.path.join(os.path.dirname(config_path), stocks_file)
         try:
-            with open(stocks_path, "r") as file:
+            with open(stocks_path, "r", encoding='utf-8') as file:
                 stocks_config = yaml.safe_load(file)
             new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_STOCKS] = stocks_config[
                 CONFIG_KEY_STOCKS

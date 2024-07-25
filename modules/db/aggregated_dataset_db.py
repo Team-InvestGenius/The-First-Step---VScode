@@ -34,12 +34,13 @@ class AggregatedDatasetDB(DBConnector):
             print(f"No data found for {symbol}")
             return
 
-        data['date'] = pd.to_datetime(data['date'])  # date 컬럼을 datetime 타입으로 변환
+        data = data.copy()  # 경고를 피하기 위해 데이터의 복사본을 생성
+        data.loc[:, 'date'] = pd.to_datetime(data['date'])  # date 컬럼을 datetime 타입으로 변환
 
         for index, row in data.iterrows():
             record = {
                 'asset_id': index + 1,  # 자동 증가 값 대신 인덱스 + 1 사용
-                'trade_date': row['date'].date(),
+                'trade_date': row['date'].date(),  # .date()를 사용하여 시간 부분 제거
                 'open': row['open'],
                 'high': row['high'],
                 'low': row['low'],
@@ -59,6 +60,8 @@ class AggregatedDatasetDB(DBConnector):
                     self.db_engine.commit()
             except pymysql.MySQLError as e:
                 print(f"Error executing insert: {e}")
+
+
 
     def update(self, data: dict, where: str):
         """
