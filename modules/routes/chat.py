@@ -50,12 +50,11 @@ def ask_question():
             f"{formatted_chat_history}\nUser: {question}"
         )
 
+        print(model_response)
+
         model_answer = model_response.get('answer')
         user_invest_type = model_response.get('user_invest_type', '공격투자형')
         answer_confidence = model_response.get('confidence', 0)
-
-        if not model_answer:
-            return jsonify({"error": "지금은 응답할 수 없습니다."}), 500
 
         use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
 
