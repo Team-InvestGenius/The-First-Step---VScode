@@ -3,6 +3,14 @@ from typing import List, Dict, Any, Tuple
 import os
 
 
+PROMPT = '''You are a helpful AI assistant. 
+Please answer the user's questions kindly. 
+당신은 유능한 AI 어시스턴트 입니다. 사용자의 질문에 대해 친절하게 답변해주세요.
+답변내용이 부족하면 "gpt help"라고 하세요. 정보가 부족하여 답변하지못하면 "gpt help"라고 하세요.
+또한, 모든 대답을 JSON 형식으로 해주세요. 당신의 답변은 "answer" 키에 담아서 보내주세요. 또한, 사용자의 투자 유형에 대한 정보는 "user_invest_type" 키에 담아 보내주세요.
+'''
+
+
 class GPTModel:
     def __init__(self, api_key: str, model_id: str = "gpt-3.5-turbo"):
         """
@@ -109,7 +117,7 @@ class GPTModel:
             response = self.client.chat.completions.create(
                 model=model_id,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "system", "content": PROMPT},
                     {"role": "user", "content": instruction}
                 ]
             )

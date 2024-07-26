@@ -1,8 +1,12 @@
 import os
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import BitsAndBytesConfig
 from functools import lru_cache
 from flask import current_app
+
+
+quantization_config = BitsAndBytesConfig(load_in_4bit=True)
 
 
 class LlamaModel:
@@ -21,18 +25,26 @@ class LlamaModel:
         self.tokenizer = None
         self.model = None
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=3)
     def load_model(self):
         if self.tokenizer is None or self.model is None:
             model_id = current_app.config['MODEL_ID']
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-            self.model = AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16).to(self.device)
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                quantization_config=quantization_config,
+                torch_dtype=torch.bfloat16).to(self.device)
         return self.model, self.tokenizer
 
     def generate_response(self, instruction):
         model, tokenizer = self.load_model()
-        PROMPT = '''You are a helpful AI assistant. Please answer the user's questions kindly. 당신은 유능한 AI 어시스턴트 입니다. 사용자의 질문에 대해 친절하게 답변해주세요.
-        답변내용이 부족하면 "gpt help"라고 하세요. 정보가 부족하여 답변하지못하면 "gpt help"라고 하세요'''
+        PROMPT = '''
+        You are a helpful AI assistant. 
+        Please answer the user's questions kindly. 
+        당신은 유능한 AI 어시스턴트 입니다. 사용자의 질문에 대해 친절하게 답변해주세요.
+        답변내용이 부족하면 "gpt help"라고 하세요. 정보가 부족하여 답변하지못하면 "gpt help"라고 하세요.
+        또한, 모든 대답을 JSON 형식으로 해주세요. 당신의 답변은 "answer" 키에 담아서 보내주세요. 또한, 사용자의 투자 유형에 대한 정보는 "user_invest_type" 키에 담아 보내주세요.
+        '''
         messages = [
             {"role": "system", "content": f"{PROMPT}"},
             {"role": "user", "content": f"{instruction}"}
