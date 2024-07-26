@@ -58,7 +58,7 @@ def ask_question():
 
         model_answer = model_response.get('answer')
         user_invest_type = model_response.get('user_invest_type')
-        answer_confidence = model_response.get('confidence', 0)
+        answer_confidence = model_response.get('confidence')
 
         use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
 
