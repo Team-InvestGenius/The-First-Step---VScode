@@ -1,3 +1,6 @@
+import json
+from datetime import datetime
+
 
 LLAMA_PROMPT = """
 You are a helpful AI assistant. Please answer the user's questions kindly. 
@@ -13,8 +16,8 @@ GPT_PROMPT = """
 
 
 def format_recent_chat_history(chat_history, n=5):
-    # 시간순으로 정렬
-    sorted_history = sorted(chat_history, key=lambda x: x['timestamp'])
+    # 시간순으로 정렬 (타임스탬프가 문자열인 경우를 대비해 datetime 객체로 변환)
+    sorted_history = sorted(chat_history, key=lambda x: datetime.fromisoformat(x['timestamp']) if isinstance(x['timestamp'], str) else x['timestamp'])
 
     # 최근 N개 선택
     recent_history = sorted_history[-n:]
@@ -29,11 +32,13 @@ def format_recent_chat_history(chat_history, n=5):
             role = 'assistant'
             # JSON 형식의 응답에서 'answer' 필드 추출
             try:
-                content_dict = eval(entry['message'])
+                content_dict = json.loads(entry['message'])
                 content = content_dict.get('answer', entry['message'])
-            except:
+            except json.JSONDecodeError:
                 content = entry['message']
+                print(f"Warning: Failed to parse JSON for message: {entry['message'][:50]}...")
         else:
+            print(f"Warning: Unknown speaker type: {entry['speaker']}")
             continue  # 알 수 없는 speaker는 무시
 
         formatted_messages.append({

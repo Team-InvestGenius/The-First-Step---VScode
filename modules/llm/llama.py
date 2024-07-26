@@ -47,15 +47,15 @@ class LlamaModel:
 
                 model_id = current_app.config['MODEL_ID']
                 model_path = current_app.config["MODEL_PATH"]
+
                 self.tokenizer = AutoTokenizer.from_pretrained(
-                    model_id,
-                    # local_files_only=False
+                    model_path, local_files_only=False
                 )
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    model_id,
+                    model_path,
                     torch_dtype=torch.bfloat16,
-                    device_map="auto",
-                    # local_files_only=False,
+                    device_map=self.device,
+                    local_files_only=False,
                 )
             return self.model, self.tokenizer
         except Exception as e:
@@ -66,11 +66,55 @@ class LlamaModel:
         model, tokenizer = self.load_model()
         messages = [
             {"role": "system", "content": f"{LLAMA_PROMPT}"},
-            {"role": "user", "content": f"{instruction}"}
+            {"role": "user", "content": f"{instruction}"},
         ]
-        input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(self.device)
-        outputs = model.generate(input_ids, max_new_tokens=2048, eos_token_id=tokenizer.eos_token_id, do_sample=True, temperature=0.6, top_p=0.9)
-        response = tokenizer.decode(outputs[0][input_ids.shape[-1]:], skip_special_tokens=True)
+        input_ids = tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, return_tensors="pt"
+        ).to(self.device)
+        outputs = model.generate(
+            input_ids,
+            max_new_tokens=2048,
+            eos_token_id=tokenizer.eos_token_id,
+            do_sample=True,
+            temperature=0.6,
+            top_p=0.9,
+        )
+        response = tokenizer.decode(
+            outputs[0][input_ids.shape[-1] :], skip_special_tokens=True
+        )
+
+        # CUDA 캐시 정리
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+        return response
+
+    def generate_response_with_history(self, instruction, conversation_history):
+        model, tokenizer = self.load_model()
+
+        # 시스템 메시지
+        messages = [{"role": "system", "content": f"{LLAMA_PROMPT}"}]
+
+        if len(conversation_history) > 0:
+            messages.extend(conversation_history)
+
+        # 사용자 메시지 추가
+        messages.append({"role": "user", "content": f"{instruction}"})
+
+        input_ids = tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True, return_tensors="pt"
+        ).to(self.device)
+        outputs = model.generate(
+            input_ids,
+            max_new_tokens=2048,
+            eos_token_id=tokenizer.eos_token_id,
+            do_sample=True,
+            temperature=0.6,
+            top_p=0.9,
+        )
+        response = tokenizer.decode(
+            outputs[0][input_ids.shape[-1] :], skip_special_tokens=True
+        )
 
         # CUDA 캐시 정리
         if torch.cuda.is_available():
