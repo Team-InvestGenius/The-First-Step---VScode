@@ -51,9 +51,12 @@ def ask_question():
         )
 
         print(model_response)
+        print(model_response.get('answer'))
+        print("")
+        print(type(model_response))
 
         model_answer = model_response.get('answer')
-        user_invest_type = model_response.get('user_invest_type', '공격투자형')
+        user_invest_type = model_response.get('user_invest_type')
         answer_confidence = model_response.get('confidence', 0)
 
         use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
