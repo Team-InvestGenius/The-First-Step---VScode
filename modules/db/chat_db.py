@@ -11,10 +11,19 @@ class ChatDBConnector(DBConnector):
     def delete(self, query, params=None):
         self.execute_query(query, params)
 
-    def create_chatroom(self, userid):
-        query = "INSERT INTO chat_rooms (user_id) VALUES (%s)"
-        self.execute_query(query, (userid,))
-        return self.connection.insert_id()
+    def create_chatroom(self, user_id):
+        try:
+            # 채팅방 생성 쿼리 실행
+            cursor = self.connection.cursor()
+            cursor.execute("INSERT INTO chat_rooms (user_id) VALUES (%s) RETURNING chatroom_id", (user_id,))
+            room_id = cursor.fetchone()[0]
+            self.connection.commit()
+            return room_id
+        except Exception as e:
+            print(f"Error creating chatroom: {e}")
+            return None
+        finally:
+            cursor.close()
 
     def get_chatroom_count_by_userid(self, userid):
         query = "SELECT COUNT(*) as count FROM chat_rooms WHERE user_id = %s"
