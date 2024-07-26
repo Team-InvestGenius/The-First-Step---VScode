@@ -49,6 +49,9 @@ def ask_question():
             f"{formatted_chat_history}\nUser: {question}"
         )
 
+        # FIXME 여기에 예외구문 입력
+        print(llama_response)
+
         if evaluate_response(llama_response, KEYWORDS):
             gpt_model = get_gpt_model()
             gpt_response = gpt_model.generate(
