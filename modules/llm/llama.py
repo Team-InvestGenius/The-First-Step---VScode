@@ -5,11 +5,22 @@ from transformers import BitsAndBytesConfig
 from functools import lru_cache
 from flask import current_app
 from modules.llm.utils import PROMPT
+import gc
 
 
 def clear_cuda_cache():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+
+def force_gc():
+    gc.collect()
+
+
+def prepare_memory_for_model_loading():
+    clear_cuda_cache()
+    force_gc()
 
 
 class LlamaModel:
@@ -30,16 +41,26 @@ class LlamaModel:
 
     @lru_cache(maxsize=1)
     def load_model(self):
-        if self.tokenizer is None or self.model is None:
-            model_id = current_app.config['MODEL_ID']
-            model_path = current_app.config["MODEL_PATH"]
-            self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                torch_dtype=torch.bfloat16,
-                device_map="auto"
-            )
-        return self.model, self.tokenizer
+        try:
+            if self.tokenizer is None or self.model is None:
+                prepare_memory_for_model_loading()  # 메모리 준비
+
+                # model_id = current_app.config['MODEL_ID']
+                model_path = current_app.config["MODEL_PATH"]
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    model_path,
+                    local_files_only=True
+                )
+                self.model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto",
+                    local_files_only=True,
+                )
+            return self.model, self.tokenizer
+        except Exception as e:
+            print(f"Error loading model: {e}")
+            raise
 
     def generate_response(self, instruction):
         model, tokenizer = self.load_model()
