@@ -52,13 +52,13 @@ def ask_question():
             model_response = model.generate_with_history(
                 f"{formatted_chat_history}\nUser: {question}"
             )
-
         else:
             model = get_gpt_model()
             formatted_chat_history = format_recent_chat_history(chat_history, n=5)
             print(formatted_chat_history)
             model_response = model.generate_with_history(formatted_chat_history)
 
+        print(model_response)
         if evaluate_response(model_response, KEYWORDS):
             gpt_model = get_gpt_model()
             gpt_response = gpt_model.generate(
