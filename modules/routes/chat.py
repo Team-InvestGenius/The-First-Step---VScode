@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 from modules.db.chat_db import ChatDBConnector
 from modules.routes.session_manager import SessionManager
 from modules.llm.chat_gpt import GPTModel
+from modules.llm.utils import format_recent_chat_history
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -40,24 +41,25 @@ def ask_question():
         db_connector = ChatDBConnector()
 
         chat_history = db_connector.get_chat_history(room_id)
-        print(chat_history)
 
-        formatted_chat_history = "\n".join(
-            [f"{entry['speaker']}: {entry['message']}" for entry in chat_history]
-        )
+        llama_model = False
 
-        # llama_model = session_manager.get_model()
-        # gpt_model
-        model = get_gpt_model()
+        if llama_model:
+            model = session_manager.get_model()
+            formatted_chat_history = "\n".join(
+                [f"{entry['speaker']}: {entry['message']}" for entry in chat_history]
+            )
+            model_response = model.generate_with_history(
+                f"{formatted_chat_history}\nUser: {question}"
+            )
 
-        llama_response = model.generate_with_history(
-            f"{formatted_chat_history}\nUser: {question}"
-        )
+        else:
+            model = get_gpt_model()
+            formatted_chat_history = format_recent_chat_history(chat_history, n=5)
+            print(formatted_chat_history)
+            model_response = model.generate_with_history(formatted_chat_history)
 
-        # FIXME 여기에 예외구문 입력
-        print(llama_response)
-
-        if evaluate_response(llama_response, KEYWORDS):
+        if evaluate_response(model_response, KEYWORDS):
             gpt_model = get_gpt_model()
             gpt_response = gpt_model.generate(
                 f"{formatted_chat_history}\nUser: {question}"
@@ -67,8 +69,8 @@ def ask_question():
             response = {"response": gpt_response, "chatroom_id": room_id}
         else:
             db_connector.save_chat_history(room_id, "user", question)
-            db_connector.save_chat_history(room_id, "llama", llama_response)
-            response = {"response": llama_response, "chatroom_id": room_id}
+            db_connector.save_chat_history(room_id, "llama", model_response)
+            response = {"response": model_response, "chatroom_id": room_id}
         return jsonify(response)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

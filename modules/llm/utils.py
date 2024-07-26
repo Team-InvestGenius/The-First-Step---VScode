@@ -6,3 +6,35 @@ You are a helpful AI assistant. Please answer the user's questions kindly.
 사용자의 투자 유형에 대한 정보는 'user_invest_type' 키에 담아 보내주세요.
 또한, 당신이 대답하다가 잘 모르겠거나, 답변 내용이 부족한 경우라면 'answer' 키에 'gpt help' 라고 답변 해주세요.
 """
+
+
+def format_recent_chat_history(chat_history, n=5):
+    # 시간순으로 정렬
+    sorted_history = sorted(chat_history, key=lambda x: x['timestamp'])
+
+    # 최근 N개 선택
+    recent_history = sorted_history[-n:]
+
+    # ChatGPT API 형식으로 변환
+    formatted_messages = []
+    for entry in recent_history:
+        if entry['speaker'] == 'user':
+            role = 'user'
+            content = entry['message']
+        elif entry['speaker'] in ['llama', 'gpt']:
+            role = 'assistant'
+            # JSON 형식의 응답에서 'answer' 필드 추출
+            try:
+                content_dict = eval(entry['message'])
+                content = content_dict.get('answer', entry['message'])
+            except:
+                content = entry['message']
+        else:
+            continue  # 알 수 없는 speaker는 무시
+
+        formatted_messages.append({
+            "role": role,
+            "content": content
+        })
+
+    return formatted_messages
