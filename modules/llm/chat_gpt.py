@@ -1,6 +1,6 @@
 from openai import OpenAI
 from typing import List, Dict, Any, Tuple
-from utils import PROMPT
+from modules.llm.utils import PROMPT
 
 
 class GPTModel:

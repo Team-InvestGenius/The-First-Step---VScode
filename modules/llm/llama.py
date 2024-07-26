@@ -4,7 +4,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import BitsAndBytesConfig
 from functools import lru_cache
 from flask import current_app
-from utils import PROMPT
+from modules.llm.utils import PROMPT
 
 
 quantization_config = BitsAndBytesConfig(load_in_4bit=True)
