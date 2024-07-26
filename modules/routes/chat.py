@@ -51,9 +51,8 @@ def ask_question():
         )
 
         print(model_response)
-        print(model_response.get('answer'))
-        print("")
         print(type(model_response))
+        print(model_response.to_json())
 
         model_answer = model_response.get('answer')
         user_invest_type = model_response.get('user_invest_type')
