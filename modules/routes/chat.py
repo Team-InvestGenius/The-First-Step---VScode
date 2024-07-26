@@ -44,8 +44,11 @@ def ask_question():
             [f"{entry['speaker']}: {entry['message']}" for entry in chat_history]
         )
 
-        llama_model = session_manager.get_model()
-        llama_response = llama_model.generate_response(
+        # llama_model = session_manager.get_model()
+        # gpt_model
+        model = get_gpt_model()
+
+        llama_response = model.generate(
             f"{formatted_chat_history}\nUser: {question}"
         )
 
