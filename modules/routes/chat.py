@@ -50,10 +50,15 @@ def ask_question():
         model_response = model.generate_response(
             f"{formatted_chat_history}\nUser: {question}"
         )
+
         print(model_response)
+
         try:
             if isinstance(model_response, str):
+                print(type(model_response))
                 model_response = json.loads(model_response)
+                print(model_response)
+                print(type(model_response))
         except (ValueError, SyntaxError) as e:
             model_response = {"answer": model_response}
 
