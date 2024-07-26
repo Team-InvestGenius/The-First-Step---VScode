@@ -1,5 +1,6 @@
 import yfinance as yf
 import pandas as pd
+from datetime import datetime
 from typing import Optional
 from modules.data.core import DataProvider
 from modules.logger import get_logger
@@ -30,8 +31,18 @@ class YahooFinance(DataProvider):
         self.raise_errors = raise_errors
         self.keepna = keepna
         self.timeout = timeout
+
+        if isinstance(start_date, datetime):
+            start_date = self._format_date(start_date)
+        if isinstance(end_date, datetime):
+            end_date = self._format_date(end_date)
+
         super().__init__(start_date=start_date, end_date=end_date)
         logger.info(f"YahooFinance initialized for symbol: {symbol}")
+
+    @staticmethod
+    def _format_date(dt: Optional[datetime]) -> Optional[str]:
+        return dt.date().isoformat() if dt else None
 
     def get_data(self) -> pd.DataFrame:
         logger.info(f"Fetching data for {self.symbol}")
@@ -90,3 +101,12 @@ class YahooFinance(DataProvider):
         except Exception as e:
             logger.error(f"Ping failed for {self.symbol}: {e}")
             return False
+
+
+if __name__ == "__main__":
+    p =  YahooFinance(
+        symbol="^TNX",
+        interval="1d",
+        period="max",
+    )
+    print(p.get_data().dropna().to_string())

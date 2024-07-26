@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from modules.data.core import DataPipeline
 from modules.algo.core import ValueBasedAlgo
 from modules.strategy.core import ValueBasedStrategy
-from modules.utils import read_config, process_data, parallel_process
+from modules.utils import read_config, process_data, parallel_process, prepare_data
 from modules.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,10 +20,10 @@ class MomentumStrategy(ValueBasedStrategy):
         train_period: int,
         valid_period: int,
         selection_method: Literal["top_n", "threshold", "relative"] = "top_n",
-        selection_param: Union[int, float] = 10,   # top_n's default number
+        selection_param: Union[int, float] = 10,  # top_n's default number
         min_stocks: int = 5,
         max_stocks: int = 20,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(dps, algo, train_period, valid_period, **kwargs)
         self.selection_method = selection_method
@@ -43,26 +43,22 @@ class MomentumStrategy(ValueBasedStrategy):
 
         """
         data_list = parallel_process(process_data, self.dps)
-        all_dfs = []
-        for data in data_list:
-            for k, df in data.items():
-                close_price = df["close"]
-                close_price.name = k
-                all_dfs.append(close_price)
-
-        all_data = pd.concat(all_dfs, axis=1).dropna()
-        self._data = all_data
+        self._data = prepare_data(data_list)
 
     def execute(
         self, execute_date: datetime = None, **kwargs
     ) -> Dict[str, Union[List[str], Dict[str, float]]]:
+
         if self._data is None:
             self.set_data()
+        logger.info(f"Executing momentum strategy on {execute_date}")
+        logger.info(f"Executing momentum strategy with {self._data.shape} size dataset")
+
         try:
             self.set_dates(execute_date=execute_date)
             train_data = self._data.loc[self.train_start_date : self.train_end_date]
             self._valid_data = self._data.loc[
-                self.valid_start_date : self.valid_end_date
+                self.valid_start_date: self.valid_end_date
             ]
             prepared_data = self.algo.prepare_data(train_data)
             calculated_values = self.algo.calculate_values(prepared_data)
@@ -78,13 +74,15 @@ class MomentumStrategy(ValueBasedStrategy):
 
     def select_stocks(self, calculated_values: pd.Series, **kwargs) -> List[str]:
         if not isinstance(calculated_values, pd.Series):
-            raise ValueError("Expected a pandas Series")
-
+            raise ValueError(f"Expected a pandas Series, input : {type(calculated_values)}")
         if self.selection_method == "top_n":
             n = np.clip(self.selection_param, self.min_stocks, self.max_stocks)
             selected = calculated_values.nlargest(n)
         elif self.selection_method == "threshold":
-            threshold = calculated_values.mean() + self.selection_param * calculated_values.std()
+            threshold = (
+                calculated_values.mean()
+                + self.selection_param * calculated_values.std()
+            )
             selected = calculated_values[calculated_values > threshold]
             if len(selected) < self.min_stocks:
                 selected = calculated_values.nlargest(self.min_stocks)
@@ -103,15 +101,23 @@ class MomentumStrategy(ValueBasedStrategy):
         selected_stocks = selected.index.tolist()
 
         if not selected_stocks:
-            logger.warning(f"No stocks were selected using the {self.selection_method} method.")
+            logger.warning(
+                f"No stocks were selected using the {self.selection_method} method."
+            )
         elif len(selected_stocks) < self.min_stocks:
-            logger.info(f"Only {len(selected_stocks)} stocks were selected. Using top {self.min_stocks} stocks instead.")
+            logger.info(
+                f"Only {len(selected_stocks)} stocks were selected. Using top {self.min_stocks} stocks instead."
+            )
             selected_stocks = calculated_values.nlargest(self.min_stocks).index.tolist()
         elif len(selected_stocks) > self.max_stocks:
-            logger.info(f"{len(selected_stocks)} stocks were selected. Limiting to top {self.max_stocks} stocks.")
+            logger.info(
+                f"{len(selected_stocks)} stocks were selected. Limiting to top {self.max_stocks} stocks."
+            )
             selected_stocks = calculated_values.nlargest(self.max_stocks).index.tolist()
 
-        logger.info(f"Selected {len(selected_stocks)} stocks: {', '.join(selected_stocks)}")
+        logger.info(
+            f"Selected {len(selected_stocks)} stocks: {', '.join(selected_stocks)}"
+        )
         return selected_stocks
 
     def calculate_performance(self) -> Dict[str, float]:
