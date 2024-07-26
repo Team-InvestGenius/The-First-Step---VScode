@@ -50,11 +50,13 @@ def ask_question():
         model_response = model.generate_response(
             f"{formatted_chat_history}\nUser: {question}"
         )
-
-        if isinstance(model_response, str):
-            model_response = ast.literal_eval(model_response)
-        else:
-            return jsonify({"error": "대답을 변환하는 작업 중에 에러가 발생했습니다."}), 500
+        print(model_response)
+        try:
+            if isinstance(model_response, str):
+                print(model_response)
+                model_response = ast.literal_eval(model_response)
+        except (ValueError, SyntaxError) as e:
+            return jsonify({"error": f"대답을 변환하는 작업 중에 에러가 발생했습니다. {e}"}), 500
 
         model_answer = model_response.get('answer')
         user_invest_type = model_response.get('user_invest_type')
