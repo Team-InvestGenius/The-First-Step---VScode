@@ -1,3 +1,4 @@
+import numpy as np
 from typing import Tuple, Dict
 from modules.logger import get_logger, setup_global_logging
 
@@ -34,6 +35,6 @@ def retrieve_selected_stocks(pool_result: Tuple, symbol_mapper: Dict) -> Dict:
         "stocks_ratio": stocks_ratio,
         "annual_return": f"{performances['annual_return']:.2%}",
         "annual_volatility": f"{performances['annual_volatility']:.2%}",
-        "sharpe_ratio": f"{performances['sharpe_ratio']:.2f}",
+        "sharpe_ratio": np.round(performances['sharpe_ratio'], 5),
         "mdd": f"{performances['mdd']:.2%}",
     }
