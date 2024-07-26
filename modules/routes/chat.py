@@ -1,3 +1,4 @@
+import ast
 from flask import Blueprint, request, jsonify, current_app
 from modules.db.chat_db import ChatDBConnector
 from modules.routes.session_manager import SessionManager
@@ -50,9 +51,10 @@ def ask_question():
             f"{formatted_chat_history}\nUser: {question}"
         )
 
-        print(model_response)
-        print(type(model_response))
-        print(model_response.to_json())
+        if isinstance(model_response, str):
+            model_response = ast.literal_eval(model_response)
+        else:
+            return jsonify({"error": "대답을 변환하는 작업 중에 에러가 발생했습니다."}), 500
 
         model_answer = model_response.get('answer')
         user_invest_type = model_response.get('user_invest_type')
@@ -64,6 +66,11 @@ def ask_question():
             gpt_model = get_gpt_model()
             formatted_chat_history = format_recent_chat_history(chat_history, n=3)
             gpt_response = gpt_model.generate_with_history(formatted_chat_history)
+
+            if isinstance(gpt_response, str):
+                gpt_response = ast.literal_eval(gpt_response)
+            else:
+                return jsonify({"error": "대답을 변환하는 작업 중에 에러가 발생했습니다."}), 500
 
             model_answer = gpt_response.get('answer', model_answer)
             user_invest_type = gpt_response.get('user_invest_type', user_invest_type)
