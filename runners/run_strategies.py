@@ -8,7 +8,7 @@ import glob
 from datetime import datetime
 from modules.utils import read_config, create_strategy
 from modules.strategy.strategy_pool import StrategyPool
-from modules.db.strategy_pool_db import StrategyPoolDB
+from modules.db.strategy_pool_db import StrategyDBConnector
 
 def prepare_data_for_insertion(data, strategy_type):
     execute_date = data[0]['execute_date']
