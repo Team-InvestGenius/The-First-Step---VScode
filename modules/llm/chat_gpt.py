@@ -77,6 +77,16 @@ class GPTModel:
         except Exception as e:
             raise RuntimeError(f"Fine-tuned 모델 목록 조회 오류: {str(e)}")
 
+    def generate_with_history(self, messages: List[Dict[str, str]]) -> str:
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_id,
+                messages=[{"role": "system", "content": PROMPT}] + messages
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            raise RuntimeError(f"텍스트 생성 오류: {str(e)}")
+
     def generate_with_fine_tuned_model(self, instruction: str, fine_tuned_model_id: str) -> str:
         """
         Fine-tuned 모델을 사용하여 텍스트 생성

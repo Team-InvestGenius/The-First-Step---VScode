@@ -40,6 +40,8 @@ def ask_question():
         db_connector = ChatDBConnector()
 
         chat_history = db_connector.get_chat_history(room_id)
+        print(chat_history)
+
         formatted_chat_history = "\n".join(
             [f"{entry['speaker']}: {entry['message']}" for entry in chat_history]
         )
@@ -48,7 +50,7 @@ def ask_question():
         # gpt_model
         model = get_gpt_model()
 
-        llama_response = model.generate(
+        llama_response = model.generate_with_history(
             f"{formatted_chat_history}\nUser: {question}"
         )
 
