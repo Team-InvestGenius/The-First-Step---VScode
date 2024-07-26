@@ -45,17 +45,17 @@ class LlamaModel:
             if self.tokenizer is None or self.model is None:
                 prepare_memory_for_model_loading()  # 메모리 준비
 
-                # model_id = current_app.config['MODEL_ID']
+                model_id = current_app.config['MODEL_ID']
                 model_path = current_app.config["MODEL_PATH"]
                 self.tokenizer = AutoTokenizer.from_pretrained(
-                    model_path,
-                    local_files_only=True
+                    model_id,
+                    # local_files_only=False
                 )
                 self.model = AutoModelForCausalLM.from_pretrained(
-                    model_path,
+                    model_id,
                     torch_dtype=torch.bfloat16,
                     device_map="auto",
-                    local_files_only=True,
+                    # local_files_only=False,
                 )
             return self.model, self.tokenizer
         except Exception as e:
