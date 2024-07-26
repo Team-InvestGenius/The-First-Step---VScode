@@ -23,7 +23,9 @@ def prepare_data_for_insertion(data, strategy_type):
         'performance': performance
     }
 
+
 if __name__ == "__main__":
+
     configs = glob.glob("../configs/strategies/kor/*.yaml")
     strategies = [create_strategy(read_config(config)) for config in configs]
     print(len(strategies))

@@ -40,7 +40,7 @@ def find_project_root(current_path: str) -> str:
 def read_config(config_path: str) -> Dict[str, Any]:
     logger.info(f"Reading config file: {config_path}")
     try:
-        with open(config_path, "r", encoding='utf-8') as file:
+        with open(config_path, "r", encoding="utf-8") as file:
             config = yaml.safe_load(file)
         logger.debug("Config file loaded successfully")
     except FileNotFoundError:
@@ -99,7 +99,7 @@ def read_config(config_path: str) -> Dict[str, Any]:
         stocks_file = new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_STOCKS_FILE]
         stocks_path = os.path.join(os.path.dirname(config_path), stocks_file)
         try:
-            with open(stocks_path, "r", encoding='utf-8') as file:
+            with open(stocks_path, "r", encoding="utf-8") as file:
                 stocks_config = yaml.safe_load(file)
             new_config[CONFIG_KEY_DATA_PIPELINES][CONFIG_KEY_STOCKS] = stocks_config[
                 CONFIG_KEY_STOCKS
@@ -118,9 +118,9 @@ def read_config(config_path: str) -> Dict[str, Any]:
 
 
 def load_module(config: Dict, type_key: str):
-    name = config[type_key]['name']
-    if 'module' in config[type_key]:
-        module_path = config[type_key]['module']
+    name = config[type_key]["name"]
+    if "module" in config[type_key]:
+        module_path = config[type_key]["module"]
     else:
         # FIXME : 모듈 경로 직접 입력
         raise NotImplemented
@@ -157,7 +157,8 @@ def create_data_providers(config: Dict[str, Any]) -> List[DataProvider]:
         symbol = stock["symbol"]
         provider_params = {
             k: stock.get(k) or data_pipelines.get(k)
-            for k in params if k in stock or k in data_pipelines
+            for k in params
+            if k in stock or k in data_pipelines
         }
 
         if provider_params.get("end_date") == "TODAY":
@@ -321,8 +322,7 @@ def create_strategy(config: Dict[str, Any]):
         return None
 
     # Create data pipelines
-    data_pipelines = create_pipelines(config)    # List[DataPipelines]
-
+    data_pipelines = create_pipelines(config)  # List[DataPipelines]
     # Create algorithm
     algorithm = None
     if algorithm_config:
@@ -333,7 +333,44 @@ def create_strategy(config: Dict[str, Any]):
             logger.error(f"Failed to load algorithm: {e}")
 
     strategy_params = strategy_config["params"]
-    strategy_params['dps'] = data_pipelines
+    strategy_params["dps"] = data_pipelines
     if algorithm:
-        strategy_params['algo'] = algorithm
+        strategy_params["algo"] = algorithm
     return strategy_class(**strategy_params)
+
+
+def prepare_data(dp_result: List) -> pd.DataFrame:
+
+    logger.info("Preparing data for strategy execution")
+
+    aggregated_data = []
+    for data in dp_result:
+        for k, df in data.items():
+            if df is None:
+                logger.warning(f"데이터가 없습니다: {k}")
+                continue
+            if df.empty:
+                logger.warning(f"빈 데이터프레임입니다: {k}")
+                continue
+            if "close" not in df.columns:
+                logger.warning(f"'close' 컬럼이 없습니다: {k}")
+                continue
+
+            close_price = df["close"]
+            if close_price.empty:
+                logger.warning(f"'close' 가격 데이터가 비어 있습니다: {k}")
+                continue
+
+            close_price.name = k
+            aggregated_data.append(close_price)
+            logger.info(f"{k}: shape {close_price.shape}")
+
+    all_data = pd.concat(aggregated_data, axis=1)
+
+    if not isinstance(all_data.index, pd.DatetimeIndex):
+        all_data.index = pd.to_datetime(all_data.index)
+        logger.info("인덱스를 datetime 형식으로 변환했습니다.")
+
+    all_data = all_data.resample("1D").last().bfill().ffill()
+    all_data = all_data.sort_index()
+    return all_data

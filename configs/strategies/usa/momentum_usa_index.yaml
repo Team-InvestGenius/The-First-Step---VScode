@@ -1,0 +1,67 @@
+strategy:
+  name: MomentumStrategy
+  module: "modules.strategy.strategy"
+  params:
+    train_period: 1000
+    valid_period: 20   # Holding periods
+    selection_method: "top_n"  #  "threshold", "relative", "top_n"
+    min_stocks: 5   # select stocks at least
+    max_stocks: 20  # select stocks maximum
+
+
+algorithm:
+  name: MomentumAlgo
+  module: "modules.algo.momentum"
+  params:
+    window: 20
+
+data_pipelines:
+  name: YahooFinance
+  module: "modules.data.yahoo_finance"
+  base_path: "data/USA"
+  interval: "1d"
+  period: "max"
+  start_date: "1970-01-01"
+  end_date: "TODAY"
+  stocks:
+    - symbol: ^GSPC
+      full_name: S&P 500 Index
+
+    - symbol: ^DJI
+      full_name: Dow Jones Industrial Average Index
+
+    - symbol: ^IXIC
+      full_name: NASDAQ Composite
+
+    - symbol: ^RUT
+      full_name: Russell 2000 Index
+
+    - symbol: ^VIX
+      full_name: CBOE Volatility Index
+
+    - symbol: ^TNX
+      full_name: CBOE Interest Rate 10 Year T Note Index
+
+    - symbol: ^IRX
+      full_name: CBOE Interest Rate 13 Week T Bill Index
+
+    - symbol: ^TYX
+      full_name: CBOE Interest Rate 30 Year T Bond Index
+
+    - symbol: ^USD
+      full_name: US Dollar Index
+
+    - symbol: ^GOLD
+      full_name: Gold Index
+
+    - symbol: ^OIL
+      full_name: Crude Oil Index
+
+    - symbol: ^GAS
+      full_name: Natural Gas Index
+
+    - symbol: ^CORN
+      full_name: Corn Index
+
+    - symbol: ^SOYB
+      full_name: Soybean Index

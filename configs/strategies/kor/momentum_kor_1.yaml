@@ -2,11 +2,13 @@ strategy:
   name: MomentumStrategy
   module: "modules.strategy.strategy"
   params:
-    train_period: 120
+    train_period: 1200
     valid_period: 20   # Holding periods
-    selection_method: "relative"  #  "threshold", "relative", "top_n"
-    min_stocks: 3   # select stocks at least
-    max_stocks: 7  # select stocks maximum
+    selection_method: "top_n"  #  "threshold", "relative", "top_n"
+    selection_param: 20   # top n
+    min_stocks: 5   # select stocks at least
+    max_stocks: 20  # select stocks maximum
+
 
 algorithm:
   name: MomentumAlgo

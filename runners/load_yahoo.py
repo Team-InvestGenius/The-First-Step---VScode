@@ -1,7 +1,8 @@
 import os
 import sys
+import pandas as pd
 import logging
-from modules.utils import create_pipelines, parallel_process, read_config, process_data
+from modules.utils import create_pipelines, parallel_process, read_config, process_data, prepare_data
 from modules.logger import get_logger, setup_global_logging
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -22,12 +23,18 @@ if __name__ == "__main__":
     )
 
     logger.info("Starting script")
+
+    # config_path = os.path.join(
+    #     project_root, "configs", "datapipelines", "yahoo_config.yaml"
+    # )
+
     config_path = os.path.join(
-        project_root, "configs", "datapipelines", "yahoo_config.yaml"
+        project_root, "configs", "strategies", "test", "momentum_usa_index.yaml"
     )
+
     config = read_config(config_path)
     dps = create_pipelines(config)
     result = parallel_process(process_data, dps)
-    print(result)
+    data = prepare_data(result)
 
-    logger.info("Script completed")
+    logger.info(f"최종 데이터 shape: {data.shape}")
