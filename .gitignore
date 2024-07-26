@@ -241,3 +241,5 @@ TASKS.md
 /logs/*
 /llama3/ft2_invest/*
 /llama3/ft2_invest
+
+test_*.py
