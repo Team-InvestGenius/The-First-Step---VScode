@@ -239,3 +239,4 @@ TASKS.md
 /data/*
 /logs
 /logs/*
+/llama3/ft2_invest/*
