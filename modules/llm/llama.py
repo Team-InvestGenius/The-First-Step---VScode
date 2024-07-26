@@ -32,7 +32,7 @@ class LlamaModel:
             self.tokenizer = AutoTokenizer.from_pretrained(model_id)
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_id,
-                quantization_config=quantization_config,
+                # quantization_config=quantization_config,
                 torch_dtype=torch.bfloat16).to(self.device)
         return self.model, self.tokenizer
 
