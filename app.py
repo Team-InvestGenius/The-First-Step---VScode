@@ -12,8 +12,10 @@ app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 app.config["GPT_MODEL_ID"] = os.getenv("GPT_MODEL_ID",  # Fine-Tuned model ID
                                        "ft:gpt-3.5-turbo-0125:personal:llm-experiment:9oAnm4r1")
 app.config["MODEL_ID"] = os.getenv("MODEL_ID", "MLP-KTLim/llama-3-Korean-Bllossom-8B")
+app.config["MODEL_PATH"] = "llama3/ft2_invest"
 app.config["DEBUG"] = os.getenv("DEBUG", "False").lower() == "true"
 app.config["PORT"] = int(os.getenv("PORT", 30000))
+
 
 # 블루프린트 등록
 app.register_blueprint(chat_bp)
