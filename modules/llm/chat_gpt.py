@@ -1,6 +1,6 @@
 from openai import OpenAI
 from typing import List, Dict, Any, Tuple
-from modules.llm.utils import PROMPT
+from modules.llm.utils import GPT_PROMPT
 
 
 class GPTModel:
@@ -81,7 +81,7 @@ class GPTModel:
         try:
             response = self.client.chat.completions.create(
                 model=self.model_id,
-                messages=[{"role": "system", "content": PROMPT}] + messages
+                messages=[{"role": "system", "content": GPT_PROMPT}] + messages
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -119,7 +119,7 @@ class GPTModel:
             response = self.client.chat.completions.create(
                 model=model_id,
                 messages=[
-                    {"role": "system", "content": PROMPT},
+                    {"role": "system", "content": GPT_PROMPT},
                     {"role": "user", "content": instruction}
                 ]
             )

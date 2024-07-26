@@ -4,7 +4,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from transformers import BitsAndBytesConfig
 from functools import lru_cache
 from flask import current_app
-from modules.llm.utils import PROMPT
+from modules.llm.utils import LLAMA_PROMPT
 import gc
 
 
@@ -65,7 +65,7 @@ class LlamaModel:
     def generate_response(self, instruction):
         model, tokenizer = self.load_model()
         messages = [
-            {"role": "system", "content": f"{PROMPT}"},
+            {"role": "system", "content": f"{LLAMA_PROMPT}"},
             {"role": "user", "content": f"{instruction}"}
         ]
         input_ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(self.device)

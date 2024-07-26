@@ -31,47 +31,54 @@ def ask_question():
         user_id = data.get("user_id")
         room_id = data.get("room_id")
 
-        if not question:
-            return jsonify({"error": "질문이 제공되지 않았습니다."}), 400
-        if not user_id:
-            return jsonify({"error": "유저 ID가 제공되지 않았습니다."}), 400
-        if not room_id:
-            return jsonify({"error": "Room ID가 제공되지 않았습니다."}), 400
+        if not all([question, user_id, room_id]):
+            missing = []
+            if not question: missing.append("질문")
+            if not user_id: missing.append("유저 ID")
+            if not room_id: missing.append("Room ID")
+            return jsonify({"error": f"다음 정보가 제공되지 않았습니다: {', '.join(missing)}"}), 400
 
         db_connector = ChatDBConnector()
-
         chat_history = db_connector.get_chat_history(room_id)
 
-        llama_model = False
+        # Llama model response
+        model = session_manager.get_model()
+        formatted_chat_history = "\n".join(
+            [f"{entry['speaker']}: {entry['message']}" for entry in chat_history]
+        )
+        model_response = model.generate_response(
+            f"{formatted_chat_history}\nUser: {question}"
+        )
 
-        if llama_model:
-            model = session_manager.get_model()
-            formatted_chat_history = "\n".join(
-                [f"{entry['speaker']}: {entry['message']}" for entry in chat_history]
-            )
-            model_response = model.generate_with_history(
-                f"{formatted_chat_history}\nUser: {question}"
-            )
-        else:
-            model = get_gpt_model()
-            formatted_chat_history = format_recent_chat_history(chat_history, n=5)
-            print(formatted_chat_history)
-            model_response = model.generate_with_history(formatted_chat_history)
+        model_answer = model_response.get('answer')
+        user_invest_type = model_response.get('user_invest_type', '공격투자형')
+        answer_confidence = model_response.get('confidence', 0)
 
-        print(model_response)
-        if evaluate_response(model_response, KEYWORDS):
+        if not model_answer:
+            return jsonify({"error": "지금은 응답할 수 없습니다."}), 500
+
+        use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
+
+        if use_gpt:
             gpt_model = get_gpt_model()
-            gpt_response = gpt_model.generate(
-                f"{formatted_chat_history}\nUser: {question}"
-            )
-            db_connector.save_chat_history(room_id, "user", question)
-            db_connector.save_chat_history(room_id, "gpt", gpt_response)
-            response = {"response": gpt_response, "chatroom_id": room_id}
-        else:
-            db_connector.save_chat_history(room_id, "user", question)
-            db_connector.save_chat_history(room_id, "llama", model_response)
-            response = {"response": model_response, "chatroom_id": room_id}
+            formatted_chat_history = format_recent_chat_history(chat_history, n=3)
+            gpt_response = gpt_model.generate_with_history(formatted_chat_history)
+
+            model_answer = gpt_response.get('answer', model_answer)
+            user_invest_type = gpt_response.get('user_invest_type', user_invest_type)
+            answer_confidence = gpt_response.get('confidence', answer_confidence)
+
+        db_connector.save_chat_history(room_id, "user", question)
+        db_connector.save_chat_history(room_id, "gpt" if use_gpt else "llama", model_answer)
+
+        response = {
+            "response": model_answer,
+            "chatroom_id": room_id,
+            "user_invest_type": user_invest_type,
+            "confidence": answer_confidence
+        }
         return jsonify(response)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
