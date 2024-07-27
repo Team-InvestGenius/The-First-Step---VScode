@@ -29,7 +29,7 @@ class ChatDBConnector(DBConnector):
     def get_chatroom_count_by_userid(self, userid):
         query = "SELECT COUNT(*) as count FROM chat_rooms WHERE user_id = %s"
         result = self.execute_query(query, (userid,))
-        return result[0]['count'] if result else 0
+        return result[0]["count"] if result else 0
 
     def get_last_active_chatroom_by_userid(self, userid):
         query = """
@@ -41,7 +41,7 @@ class ChatDBConnector(DBConnector):
         LIMIT 1
         """
         result = self.execute_query(query, (userid,))
-        return result[0]['chatroom_id'] if result else None
+        return result[0]["chatroom_id"] if result else None
 
     def get_chat_history(self, chatroom_id):
         query = "SELECT speaker, message, timestamp FROM chat_history WHERE room_id = %s ORDER BY timestamp ASC"

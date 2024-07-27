@@ -41,12 +41,15 @@ class SessionManager:
     #             logger.error(f"Error saving model state: {str(e)}")
 
     def delete_session(self, user_id, chatroom_id):
-        logger.debug(f"Deleting session for user_id: {user_id}, chatroom_id: {chatroom_id}")
+        logger.debug(
+            f"Deleting session for user_id: {user_id}, chatroom_id: {chatroom_id}"
+        )
         try:
-            delete_model_state(user_id, chatroom_id)
+            # delete_model_state(user_id, chatroom_id)
             logger.debug("Model state deleted.")
         except Exception as e:
             logger.error(f"Error deleting model state: {str(e)}")
+
 
 
 session_manager = SessionManager.get_instance()  # Global Instance

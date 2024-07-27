@@ -6,10 +6,8 @@ from modules.llm.chat_gpt import GPTModel
 from modules.llm.utils import format_recent_chat_history
 
 chat_bp = Blueprint("chat", __name__)
-
 # 키워드를 변수로 저장
 KEYWORDS = ["죄송합니다", "모르겠습니다", "잘 모르겠", "gpt help"]
-
 session_manager = SessionManager.get_instance()
 
 
@@ -24,6 +22,40 @@ def evaluate_response(response: str, keywords: list) -> bool:
     return any(keyword in response for keyword in keywords)
 
 
+def parse_model_response(response):
+    try:
+        if isinstance(response, str):
+            parsed_response = json.loads(response)
+        elif isinstance(response, dict):
+            parsed_response = response
+        else:
+            raise ValueError("Unexpected response type")
+
+        # 필수 필드 확인
+        required_fields = ['answer', 'user_invest_type', 'confidence']
+        for field in required_fields:
+            if field not in parsed_response:
+                raise KeyError(f"Missing required field: {field}")
+
+        return parsed_response, None
+
+    except json.JSONDecodeError as e:
+        error = {
+            "error_type": "JSONDecodeError",
+            "error_message": "응답을 JSON으로 파싱할 수 없습니다.",
+            "original_response": response[:100] + "..." if len(response) > 100 else response
+        }
+        return None, error
+
+    except (ValueError, KeyError) as e:
+        error = {
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "original_response": response if isinstance(response, str) else str(response)
+        }
+        return None, error
+
+
 @chat_bp.route("/ask", methods=["POST"])
 def ask_question():
     try:
@@ -31,16 +63,22 @@ def ask_question():
         question = data.get("question")
         user_id = data.get("user_id")
         room_id = data.get("room_id")
-
         if not all([question, user_id, room_id]):
             missing = []
-            if not question: missing.append("질문")
-            if not user_id: missing.append("유저 ID")
-            if not room_id: missing.append("Room ID")
-            return jsonify({"error": f"다음 정보가 제공되지 않았습니다: {', '.join(missing)}"}), 400
-            
-        print(f"질문 확인{question}") #
-        
+
+            if not question:
+                missing.append("질문")
+            if not user_id:
+                missing.append("유저 ID")
+            if not room_id:
+                missing.append("Room ID")
+            return (
+                jsonify(
+                    {"error": f"다음 정보가 제공되지 않았습니다: {', '.join(missing)}"}
+                ),
+                400,
+            )
+        print(f"질문 확인 : {question}")  #
         # Question 자체에 대한 필터링 필요함. 빈 값이거나 특정 키워드가 포함되어 있으면 에러 반환
         if not question.strip():
             return jsonify({"error": "질문이 비어 있습니다."}), 400
@@ -48,73 +86,88 @@ def ask_question():
         # Llama model response
         llama_model = session_manager.get_model()
         db_connector = ChatDBConnector()
+        chat_history = db_connector.get_chat_history(room_id)  # Return: str
 
-        chat_history = db_connector.get_chat_history(room_id)   # Return: str
-        print(f"채팅히스토리 db가져오기{chat_history}")  #
-        
-        if chat_history is None:
+        print(f"db에서히스토리가져오기 : {chat_history}")  #
+
+        if chat_history is None or len(chat_history) == 0:
             # 새로운 대화
             model_response = llama_model.generate_response(question)
-            print(f"history = none일경우 {model_response}")   #
+            print(f"새로운 대화시 답변 : {model_response}")  #
         else:
             # 기존 재화 존재시
             chat_history = format_recent_chat_history(chat_history, n=3)
-            print(f"기존재화존재시 히스토리{chat_history}")
-            
-            model_response = llama_model.generate_response_with_history(question, chat_history)
-            print("기존재화존재시 모델반응:",model_response)
-        try:
-            if isinstance(model_response, str):
-                model_response = json.loads(model_response)
-                print(f"try일경우{model_response}")
-        except (ValueError, SyntaxError) as e:
-            print(e)
-            model_response = {"answer": model_response}
-            print("예외일경우 :",model_response)
 
-        model_answer = model_response.get('answer')
-        user_invest_type = model_response.get('user_invest_type')
-        answer_confidence = model_response.get('confidence')
-        print(model_answer,user_invest_type,answer_confidence)
+            print(f"기존대화존재시 히스토리 : {chat_history}")
+
+            model_response = llama_model.generate_response_with_history(
+                question, chat_history
+            )
+            print(f"기존대화존재시 답변 : {model_response}")
+
+        try:
+            model_response, error = parse_model_response(model_response)
+            if error:
+                # 로깅
+                current_app.logger.error(f"라마모델 response parsing error: {error}")
+
+                # 기본 응답 생성
+                model_response = {
+                    "answer": "죄송합니다. 응답을 처리하는 중 오류가 발생했습니다.",
+                    "user_invest_type": None,
+                    "confidence": 0
+                }
+
+            model_answer = model_response["answer"]
+            user_invest_type = model_response["user_invest_type"]
+            answer_confidence = model_response["confidence"]
+        
+            print(model_answer,user_invest_type,answer_confidence)
+        
+        except Exception as e:
+            current_app.logger.error(f"오류발생 parse_model_response: {str(e)}")
+            return jsonify({"error": "내부 서버 오류가 발생했습니다."}), 500
+
+
         use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
-        print(use_gpt)
+        print(f"gpt로 가는 여부:{use_gpt}")
         if use_gpt:
             # GPT Model
             gpt_model = get_gpt_model()
             if len(chat_history) > 0:
                 # 기존 대화 존재시, 현재 대화까지 붙여서 같이 보냄
-                chat_history.extend(
-                    [{
-                        "role": "user",
-                        "content": question
-                    }])
+                chat_history.extend([{"role": "user", "content": question}])
                 gpt_response = gpt_model.generate_with_history(chat_history)
             else:
                 # 신규 대화일 경우?
                 gpt_response = gpt_model.generate(question)
 
-            try:
-                if isinstance(gpt_response, str):
-                    gpt_response = json.loads(gpt_response)
-            except (ValueError, SyntaxError) as e:
-                return jsonify({"error": f"대답을 변환하는 작업 중에 에러가 발생했습니다. {e}"}), 500
+            gpt_response, error = parse_model_response(gpt_response)
+
+            if error:
+                current_app.logger.error(f"GPT 대답 parsing error: {error}")
+                # 이전 LLAMA 모델의 응답을 유지
+            else:
+                model_answer = gpt_response["answer"]
+                user_invest_type = gpt_response["user_invest_type"]
+                answer_confidence = gpt_response["confidence"]
 
             # 각각 값 없는 경우, 이전 LLAMA 모델 활용
-            model_answer = gpt_response.get('answer', model_answer)
-            user_invest_type = gpt_response.get('user_invest_type', user_invest_type)
-            answer_confidence = gpt_response.get('confidence', answer_confidence)
+            model_answer = gpt_response.get("answer", model_answer)
+            user_invest_type = gpt_response.get("user_invest_type", user_invest_type)
+            answer_confidence = gpt_response.get("confidence", answer_confidence)
 
         db_connector.save_chat_history(room_id, "user", question)
-        db_connector.save_chat_history(room_id, "gpt" if use_gpt else "llama", model_answer)
-
+        db_connector.save_chat_history(
+            room_id, "gpt" if use_gpt else "llama", model_answer
+        )
         response = {
             "response": model_answer,
             "chatroom_id": room_id,
             "user_invest_type": user_invest_type,
-            "confidence": answer_confidence
+            "confidence": answer_confidence,
         }
         return jsonify(response)
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
@@ -127,10 +180,8 @@ def delete_chatroom():
         data = request.get_json()
         chatroom_id = data.get("chatroom_id")
         user_id = data.get("user_id")
-
         if not chatroom_id or not user_id:
             return jsonify({"error": "채팅방 ID와 유저 ID가 제공되지 않았습니다."}), 400
-
         db_connector = ChatDBConnector()
         try:
             db_connector.delete_chatroom(chatroom_id)
@@ -149,7 +200,6 @@ def get_history():
     chatroom_id = request.args.get("chatroom_id")
     if not chatroom_id:
         return jsonify({"error": "채팅방 ID가 제공되지 않았습니다."}), 400
-
     db_connector = ChatDBConnector()
     try:
         chat_history = db_connector.get_chat_history(chatroom_id)
@@ -163,10 +213,8 @@ def create_room():
     try:
         data = request.get_json()
         user_id = data.get("user_id")
-
         if not user_id:
             return jsonify({"error": "user_id 제공되지 않음"}), 400
-
         db_connector = ChatDBConnector()
         try:
             chatroom_count = db_connector.get_chatroom_count_by_userid(user_id)
@@ -178,7 +226,6 @@ def create_room():
             room_id = db_connector.create_chatroom(user_id)
             if not room_id:
                 raise Exception("Chat room creation failed")
-
             return jsonify({"room_id": room_id})
         finally:
             db_connector.close()

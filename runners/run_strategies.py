@@ -8,7 +8,7 @@ import glob
 from datetime import datetime
 from modules.utils import read_config, create_strategy
 from modules.strategy.strategy_pool import StrategyPool
-from modules.db.strategy_pool_db import StrategyPoolDB
+from modules.db.strategy_pool_db import StrategyDBConnector
 
 def prepare_data_for_insertion(data, strategy_type):
     execute_date = data[0]['execute_date']
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     port = 3307
 
     # StrategyPoolDB 인스턴스 생성
-    db = StrategyPoolDB(db_address, user_id, pw, db_name)
+    db = StrategyDBConnector(db_address, user_id, pw, db_name)
 
     # r 값을 테이블에 삽입
     db.insert(prepare_data_for_insertion(r, "aggressive"))

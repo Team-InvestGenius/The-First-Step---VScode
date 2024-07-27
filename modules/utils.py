@@ -374,3 +374,14 @@ def prepare_data(dp_result: List) -> pd.DataFrame:
     all_data = all_data.resample("1D").last().bfill().ffill()
     all_data = all_data.sort_index()
     return all_data
+
+
+def create_symbol_mapper(configs: List[Dict]) -> Dict[str, str]:
+    symbol_mapper = {}
+    for config in configs:
+        if "data_pipelines" in config and "stocks" in config["data_pipelines"]:
+            data_info = config["data_pipelines"]["stocks"]
+            for d in data_info:
+                if "symbol" in d and "full_name" in d:
+                    symbol_mapper[d["symbol"]] = d["full_name"]
+    return symbol_mapper
