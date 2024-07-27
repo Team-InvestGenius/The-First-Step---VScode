@@ -1,66 +1,83 @@
 import sys
 import os
-
-# 현재 파일의 상위 디렉토리를 모듈 경로에 추가
-sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-
 import glob
-from datetime import datetime
-from modules.utils import read_config, create_strategy
+import logging
+
+# 현재 파일의 상위 디렉토리 경로 설정
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+sys.path.append(project_root)
+sys.path.append(os.path.join(project_root, 'modules'))
+sys.path.append(os.path.join(project_root, 'modules', 'db'))
+
+from modules.utils import read_config, create_strategy, create_symbol_mapper
 from modules.strategy.strategy_pool import StrategyPool
+from modules.strategy.utils import retrieve_selected_stocks
+from modules.logger import get_logger, setup_global_logging
 from modules.db.strategy_pool_db import StrategyDBConnector
 
-def prepare_data_for_insertion(data, strategy_type):
-    execute_date = data[0]['execute_date']
-    selected_stocks = str(data[0]['selected_stocks'])
-    performance = str(data[0]['performance'])
-    national = 'KOR'  # 적절한 국가 값을 입력하세요
-    return {
-        'execute_date': execute_date,
-        'trading_preferences': strategy_type,
-        'national': national,
-        'selected_stocks': selected_stocks,
-        'performance': performance
-    }
-
+# 로거 설정
+logger = get_logger(__name__)
 
 if __name__ == "__main__":
+    # 전역 로깅 설정
+    setup_global_logging(
+        log_dir=os.path.join(project_root, "logs"),
+        log_level=logging.WARNING,
+        file_level=logging.DEBUG,
+        stream_level=logging.INFO,
+        # telegram_token과 telegram_chat_id는 필요한 경우 추가
+    )
 
-    configs = glob.glob("../configs/strategies/kor/*.yaml")
-    strategies = [create_strategy(read_config(config)) for config in configs]
-    print(len(strategies))
-    
+    logger.info("Starting script")
+
+    national = "kor"
+
+    config_file_list = glob.glob(f"../configs/strategies/{national}/*.yaml")
+    configs = [read_config(config_file) for config_file in config_file_list]
+    strategies = [create_strategy(config) for config in configs]
+
+    symbol_mapper = create_symbol_mapper(configs)
+    n_of_strategies = len(strategies)
+
     pool = StrategyPool(strategies, "aggressive")  # 위험선호형
     r = pool.execute()
-    print(r)
 
-    pool2 = StrategyPool(strategies, "conservative") 
-    r2 = pool2.execute()
-    print(r2)
+    r1_result = retrieve_selected_stocks(r, symbol_mapper)
+    r1_result['n_of_strategies'] = n_of_strategies   # 검토한 전략의 수
+    r1_result['national'] = national.upper()         # 투자 국가
+    r1_result['trading_preferences'] = "공격투자형"    # 투자 유형
 
-    pool3 = StrategyPool(strategies, "sharp") 
-    r3 = pool3.execute()
-    print(r3)
-
-    pool4 = StrategyPool(strategies)  # 위험회피형
-    r4 = pool4.execute()
-    print(r4)
-
-    # DBConnector 인스턴스 생성
+    print(r1_result)
+    
     db_address = 'project-db-campus.smhrd.com'
     user_id = 'InvestGenius'
     pw = '12345'
     db_name = 'InvestGenius'
     port = 3307
 
-    # StrategyPoolDB 인스턴스 생성
-    db = StrategyDBConnector(db_address, user_id, pw, db_name)
+    db = StrategyDBConnector()
+    db.insert_strategy_result(r1_result)
+    db.close()
 
-    # r 값을 테이블에 삽입
-    db.insert(prepare_data_for_insertion(r, "aggressive"))
-    db.insert(prepare_data_for_insertion(r2, "conservative"))
-    db.insert(prepare_data_for_insertion(r3, "sharp"))
-    db.insert(prepare_data_for_insertion(r4, "conservative"))  # 위험회피형을 위해 적절한 값 입력
+    pool2 = StrategyPool(strategies, "conservative")
+    r2 = pool2.execute()
+    r2_result = retrieve_selected_stocks(r2, symbol_mapper)
+    r2_result['n_of_strategies'] = n_of_strategies   # 검토한 전략의 수
+    r2_result['national'] = national.upper()         # 투자 국가
+    r2_result['trading_preferences'] = "방어투자형"    # 투자 유형
 
-    # 데이터베이스 연결 닫기
+    db = StrategyDBConnector()
+    db.insert_strategy_result(r2_result)
+    db.close()
+
+    pool3 = StrategyPool(strategies)  # 위험회피형
+    r3 = pool3.execute()
+    r3_result = retrieve_selected_stocks(r3, symbol_mapper)
+    r3_result['n_of_strategies'] = n_of_strategies   # 검토한 전략의 수
+    r3_result['national'] = national.upper()         # 투자 국가
+    r3_result['trading_preferences'] = "중립투자형"    # 투자 유형
+
+    db = StrategyDBConnector()
+    db.insert_strategy_result(r3_result)
     db.close()
