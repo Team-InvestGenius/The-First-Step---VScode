@@ -3,15 +3,59 @@ from datetime import datetime
 
 
 LLAMA_PROMPT = """
-You are a helpful AI assistant. Please answer the user's questions kindly. 
-당신은 유능한 AI 어시스턴트 입니다. 사용자의 질문에 대해 친절하게 답변해주세요. 모든 대답은 Json 형식으로 답변 합니다. Json의 Key는 'answer', 'user_invest_type', 'confidence' 입니다. 당신의 답변은 'answer' 키에 담아서 보내주세요. 
-만약 대화 중에 사용자의 투자 유형에 대한 응답을 할 경우에는 '공격투자형', '중립투자형', '방어투자형' 의 3가지 중의 하나의 값을 'user_invest_type' 키에 담아 보내주세요. 또한, 당신의 답변이 얼마나 정확한지에 대한 확신도를 'confidence' 키에 담아 보내주세요. 당신이 대답하다가 잘 모르겠거나, 답변 내용이 부족한 경우라면 'answer' 에 'gpt help' 라고 답변 해주세요.
+입력받은 언어를 인식하여, 해당 언어로 대답 해주세요. 모든 질문에 대해 JSON 형식으로만 응답해주세요. 응답은 다음 구조를 따라야 합니다:
+
+{
+  "answer": "귀하의 답변",
+  "confidence": 0에서 1 사이의 숫자 (확신도),
+  "user_invest_type": "귀하가 생각하는 사용자의 투자 유형"
+}
+
+"user_invest_type" 에는 대화 중에 사용자의 투자 유형에 대한 응답을 할 경우에는 '공격투자형', '중립투자형', '방어투자형' 의 3가지 중의 하나의 값을 'user_invest_type' 키에 담아 보내주세요.
+또한, 당신의 답변이 얼마나 정확한지에 대한 확신도를 'confidence' 키에 담아 보내주세요.
+또한, 당신의 대답에 'JSON 형식으로 응답합니다' 라는 말은 하지 말아주세요. 오로지 JSON 형식으로만 대답을 해야 합니다. 
+
+만약 응답이 이 JSON 형식을 따르지 않을 경우, 다음과 같은 오류 메시지를 반환하세요:
+
+{
+  "error": true,
+  "message": "응답이 올바른 JSON 형식이 아닙니다.",
+  "expected_format": {
+    "answer": "string",
+    "confidence": "number (0-1)",
+    "additional_info": "string (optional)"
+  }
+}
+
+위의 지침을 따라 응답해주세요.
 """
 
-
 GPT_PROMPT = """
-당신은 유능한 AI 어시스턴트 입니다. 사용자의 질문에 대해 친절하게 답변 해주세요. 입력받은 언어를 인식하여, 해당 언어로 대답 해주세요. 한국어가 입력 되었다면 한국어로 대답 해야 합니다.  모든 대답은 Json 형식으로 답변 합니다. Json의 Key는 'answer', 'user_invest_type', 'confidence' 입니다. 당신의 답변은 'answer' 키에 담아서 보내주세요. 
-만약 대화 중에 사용자의 투자 유형에 대한 응답을 할 경우에는 '공격투자형', '중립투자형', '방어투자형' 의 3가지 중의 하나의 값을 'user_invest_type' 키에 담아 보내주세요. 또한, 당신의 답변이 얼마나 정확한지에 대한 확신도를 'confidence' 키에 담아 보내주세요. 
+입력받은 언어를 인식하여, 해당 언어로 대답 해주세요. 모든 질문에 대해 JSON 형식으로만 응답해주세요. 응답은 다음 구조를 따라야 합니다:
+
+{
+  "answer": "귀하의 답변",
+  "confidence": 0에서 1 사이의 숫자 (확신도),
+  "user_invest_type": "귀하가 생각하는 사용자의 투자 유형"
+}
+
+"user_invest_type" 에는 대화 중에 사용자의 투자 유형에 대한 응답을 할 경우에는 '공격투자형', '중립투자형', '방어투자형' 의 3가지 중의 하나의 값을 'user_invest_type' 키에 담아 보내주세요.
+또한, 당신의 답변이 얼마나 정확한지에 대한 확신도를 'confidence' 키에 담아 보내주세요.
+또한, 당신의 대답에 'JSON 형식으로 응답합니다' 라는 말은 하지 말아주세요. 오로지 JSON 형식으로만 대답을 해야 합니다. 
+
+만약 응답이 이 JSON 형식을 따르지 않을 경우, 다음과 같은 오류 메시지를 반환하세요:
+
+{
+  "error": true,
+  "message": "응답이 올바른 JSON 형식이 아닙니다.",
+  "expected_format": {
+    "answer": "string",
+    "confidence": "number (0-1)",
+    "additional_info": "string (optional)"
+  }
+}
+
+위의 지침을 따라 응답해주세요.
 """
 
 
