@@ -1,13 +1,12 @@
 import sys
 import os
 import pymysql
-
+from datetime import datetime
 # 현재 파일의 상위 디렉토리를 모듈 경로에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
-
-from db_connector import DBConnector
+from modules.db.db_connector import DBConnector
 import json
 
 class StrategyDBConnector(DBConnector):
@@ -71,27 +70,30 @@ class StrategyDBConnector(DBConnector):
             print(f"Error inserting strategy result: {e}")
             self.connection.rollback()
 
-    def get_strategies(self, execute_date, invest_type):
+    def get_best_strategy(self, user_invest_type):
         """
-        특정 날짜와 투자 성향에 맞는 전략을 조회합니다.
-        :param execute_date: 조회할 날짜 (date 객체)
-        :param invest_type: 투자 성향 (string)
-        :return: 조회된 전략 목록
+        특정 날짜와 투자 성향에 맞는 최고의 전략을 조회합니다.
+        :param user_invest_type: 투자 성향 (string)
+        :return: 조회된 전략 (dictionary)
         """
         try:
-            with self.connection.cursor() as cursor:
+            with self.connection.cursor(pymysql.cursors.DictCursor) as cursor:
+                today_date = datetime.now().strftime('%Y-%m-%d')
                 query = """
-                    SELECT selected_stocks
+                    SELECT * 
                     FROM Strategy_pool 
-                    WHERE DATE(execute_date) = %s AND invest_type = %s
+                    WHERE DATE(execute_date) = %s 
+                    AND invest_type LIKE %s 
+                    ORDER BY sharpe_ratio DESC 
+                    LIMIT 1
                 """
-                cursor.execute(query, (execute_date, invest_type))
-                result = cursor.fetchall()
+                cursor.execute(query, (today_date, f'%{user_invest_type}%'))
+                result = cursor.fetchone()
                 return result
         except pymysql.MySQLError as e:
             print(f"전략 가져오기 에러: {e}")
             return None
-
+            
     def get_stock_meta(self, symbols):
         """
         종목 심볼 목록에 대한 메타 데이터를 조회합니다.

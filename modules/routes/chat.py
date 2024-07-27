@@ -1,13 +1,13 @@
 import json
 from flask import Blueprint, request, jsonify, current_app
 from modules.db.chat_db import ChatDBConnector
+from modules.db.strategy_pool_db import StrategyDBConnector
 from modules.routes.session_manager import SessionManager
 from modules.llm.chat_gpt import GPTModel
-from modules.llm.utils import format_recent_chat_history
+from modules.llm.utils import format_recent_chat_history, is_portfolio_request, evaluate_response
 
 chat_bp = Blueprint("chat", __name__)
-# 키워드를 변수로 저장
-KEYWORDS = ["죄송합니다", "모르겠습니다", "잘 모르겠", "gpt help"]
+
 session_manager = SessionManager.get_instance()
 
 
@@ -16,10 +16,6 @@ def get_gpt_model():
     model_id = current_app.config["GPT_MODEL_ID"]
     return GPTModel(api_key=api_key, model_id=model_id)
 
-
-def evaluate_response(response: str, keywords: list) -> bool:
-    """응답에 특정 키워드가 포함되어 있는지 확인"""
-    return any(keyword in response for keyword in keywords)
 
 
 def parse_model_response(response):
@@ -65,53 +61,39 @@ def ask_question():
         room_id = data.get("room_id")
         if not all([question, user_id, room_id]):
             missing = []
-
             if not question:
                 missing.append("질문")
             if not user_id:
                 missing.append("유저 ID")
             if not room_id:
                 missing.append("Room ID")
-            return (
-                jsonify(
-                    {"error": f"다음 정보가 제공되지 않았습니다: {', '.join(missing)}"}
-                ),
-                400,
-            )
-        print(f"질문 확인 : {question}")  #
-        # Question 자체에 대한 필터링 필요함. 빈 값이거나 특정 키워드가 포함되어 있으면 에러 반환
+            return jsonify({"error": f"다음 정보가 제공되지 않았습니다: {', '.join(missing)}"}), 400
+
+        current_app.logger.info(f"질문 확인: {question}")
+        
         if not question.strip():
             return jsonify({"error": "질문이 비어 있습니다."}), 400
 
-        # Llama model response
         llama_model = session_manager.get_model()
         db_connector = ChatDBConnector()
-        chat_history = db_connector.get_chat_history(room_id)  # Return: str
+        chat_history = db_connector.get_chat_history(room_id)
 
-        print(f"db에서히스토리가져오기 : {chat_history}")  #
+        current_app.logger.info(f"DB에서 히스토리 가져오기: {chat_history}")
 
         if chat_history is None or len(chat_history) == 0:
-            # 새로운 대화
             model_response = llama_model.generate_response(question)
-            print(f"새로운 대화시 답변 : {model_response}")  #
+            current_app.logger.info(f"새로운 대화시 답변: {model_response}")
         else:
-            # 기존 재화 존재시
             chat_history = format_recent_chat_history(chat_history, n=3)
+            current_app.logger.info(f"기존 대화 존재시 히스토리: {chat_history}")
+            model_response = llama_model.generate_response_with_history(question, chat_history)
 
-            print(f"기존대화존재시 히스토리 : {chat_history}")
-
-            model_response = llama_model.generate_response_with_history(
-                question, chat_history
-            )
-            print(f"기존대화존재시 답변 : {model_response}")
+        current_app.logger.info(f"라마모델 응답: {model_response}")
 
         try:
             model_response, error = parse_model_response(model_response)
             if error:
-                # 로깅
                 current_app.logger.error(f"라마모델 response parsing error: {error}")
-
-                # 기본 응답 생성
                 model_response = {
                     "answer": "죄송합니다. 응답을 처리하는 중 오류가 발생했습니다.",
                     "user_invest_type": None,
@@ -121,46 +103,58 @@ def ask_question():
             model_answer = model_response["answer"]
             user_invest_type = model_response["user_invest_type"]
             answer_confidence = model_response["confidence"]
-        
-            print(model_answer,user_invest_type,answer_confidence)
-        
+
+            current_app.logger.info(f"모델 답변: {model_answer}, 투자 유형: {user_invest_type}, 확신도: {answer_confidence}")
+
         except Exception as e:
-            current_app.logger.error(f"오류발생 parse_model_response: {str(e)}")
+            current_app.logger.error(f"오류 발생 parse_model_response: {str(e)}")
             return jsonify({"error": "내부 서버 오류가 발생했습니다."}), 500
 
-
-        use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
-        print(f"gpt로 가는 여부:{use_gpt}")
+        use_gpt = evaluate_response(model_answer) or answer_confidence < 0.4
+        current_app.logger.info(f"gpt 사용 여부: {use_gpt}")
         if use_gpt:
-            # GPT Model
             gpt_model = get_gpt_model()
-            if len(chat_history) > 0:
-                # 기존 대화 존재시, 현재 대화까지 붙여서 같이 보냄
+            if chat_history:
                 chat_history.extend([{"role": "user", "content": question}])
                 gpt_response = gpt_model.generate_with_history(chat_history)
             else:
-                # 신규 대화일 경우?
                 gpt_response = gpt_model.generate(question)
 
             gpt_response, error = parse_model_response(gpt_response)
-
-            if error:
-                current_app.logger.error(f"GPT 대답 parsing error: {error}")
-                # 이전 LLAMA 모델의 응답을 유지
-            else:
+            if not error:
                 model_answer = gpt_response["answer"]
                 user_invest_type = gpt_response["user_invest_type"]
                 answer_confidence = gpt_response["confidence"]
 
-            # 각각 값 없는 경우, 이전 LLAMA 모델 활용
-            model_answer = gpt_response.get("answer", model_answer)
-            user_invest_type = gpt_response.get("user_invest_type", user_invest_type)
-            answer_confidence = gpt_response.get("confidence", answer_confidence)
+        is_portfolio = is_portfolio_request(question)
+        strategy_message = ""
+        strategy = None
+        if is_portfolio:
+            strategy_db_connector = StrategyDBConnector()
+            strategy = strategy_db_connector.get_best_strategy(user_invest_type)
+            if strategy:
+                execute_date = strategy.get("execute_date", "")
+                n_of_strategies = strategy.get("n_of_strategies", "")
+                select_stock_name = strategy.get("selected_stock_names", "")
+                stocks_ratios_json = strategy.get("stocks_ratio", "")
+                stocks_ratios_dict = json.loads(stocks_ratios_json)
+                stocks_ratio = ', '.join([f"{key} {value}" for key, value in stocks_ratios_dict.items()])
+                annual_return = strategy.get("annual_return", "")
+                mdd = strategy.get("mdd", "")
+
+                strategy_message = f"""
+                {execute_date}의 추천 전략을 말씀 드리겠습니다.
+                오늘의 추천 전략은 전체 {n_of_strategies} 개의 투자 전략을 검토하였고,
+                그 결과 고객님의 투자 유형인 {user_invest_type}에 적합한 투자 포트폴리오 입니다.
+                {stocks_ratio} 을 매수하는 것 이며,
+                해당 포트폴리오로 투자 하였을 때 예상할 수 있는 연평균 기대수익은 {annual_return} 이며,
+                최대 낙폭은 {mdd} 입니다.
+                """
+                model_answer = strategy_message
 
         db_connector.save_chat_history(room_id, "user", question)
-        db_connector.save_chat_history(
-            room_id, "gpt" if use_gpt else "llama", model_answer
-        )
+        db_connector.save_chat_history(room_id, "gpt" if use_gpt else "llama", model_answer)
+
         response = {
             "response": model_answer,
             "chatroom_id": room_id,
@@ -169,6 +163,7 @@ def ask_question():
         }
         return jsonify(response)
     except Exception as e:
+        current_app.logger.error(f"Exception in ask_question: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         db_connector.close()

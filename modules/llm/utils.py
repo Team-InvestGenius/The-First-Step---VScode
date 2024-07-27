@@ -27,6 +27,8 @@ LLAMA_PROMPT = """
   }
 }
 
+"전략 추천해줘" 라는 질문을 받으면 
+
 위의 지침을 따라 응답해주세요.
 """
 
@@ -87,3 +89,13 @@ def format_recent_chat_history(chat_history, n=5):
         formatted_messages.append({"role": role, "content": entry["message"]})
 
     return formatted_messages
+
+
+def is_portfolio_request(question): 
+    keywords = ["포트폴리오 추천", "포트폴리오 추천해줘", "투자 포트폴리오"]
+    return any(keyword in question for keyword in keywords)
+
+def evaluate_response(response: str): 
+    """응답에 특정 키워드가 포함되어 있는지 확인"""
+    keywords = ["죄송합니다", "모르겠습니다", "잘 모르겠", "gpt help"]
+    return any(keyword in response for keyword in keywords)
