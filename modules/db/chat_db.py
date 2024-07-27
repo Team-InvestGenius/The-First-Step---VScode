@@ -15,8 +15,8 @@ class ChatDBConnector(DBConnector):
         try:
             # 채팅방 생성 쿼리 실행
             cursor = self.connection.cursor()
-            cursor.execute("INSERT INTO chat_rooms (user_id) VALUES (%s) RETURNING chatroom_id", (user_id,))
-            room_id = cursor.fetchone()[0]
+            cursor.execute("INSERT INTO chat_rooms (user_id) VALUES (%s)", (user_id,))
+            room_id = cursor.lastrowid  # 마지막 삽입된 row의 ID를 가져옴
             self.connection.commit()
             return room_id
         except Exception as e:
@@ -24,6 +24,7 @@ class ChatDBConnector(DBConnector):
             return None
         finally:
             cursor.close()
+
 
     def get_chatroom_count_by_userid(self, userid):
         query = "SELECT COUNT(*) as count FROM chat_rooms WHERE user_id = %s"

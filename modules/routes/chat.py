@@ -38,7 +38,9 @@ def ask_question():
             if not user_id: missing.append("유저 ID")
             if not room_id: missing.append("Room ID")
             return jsonify({"error": f"다음 정보가 제공되지 않았습니다: {', '.join(missing)}"}), 400
-
+            
+        print(f"질문 확인{question}") #
+        
         # Question 자체에 대한 필터링 필요함. 빈 값이거나 특정 키워드가 포함되어 있으면 에러 반환
         if not question.strip():
             return jsonify({"error": "질문이 비어 있습니다."}), 400
@@ -48,28 +50,34 @@ def ask_question():
         db_connector = ChatDBConnector()
 
         chat_history = db_connector.get_chat_history(room_id)   # Return: str
-
+        print(f"채팅히스토리 db가져오기{chat_history}")  #
+        
         if chat_history is None:
             # 새로운 대화
             model_response = llama_model.generate_response(question)
+            print(f"history = none일경우 {model_response}")   #
         else:
             # 기존 재화 존재시
             chat_history = format_recent_chat_history(chat_history, n=3)
+            print(f"기존재화존재시 히스토리{chat_history}")
+            
             model_response = llama_model.generate_response_with_history(question, chat_history)
-
+            print("기존재화존재시 모델반응:",model_response)
         try:
             if isinstance(model_response, str):
                 model_response = json.loads(model_response)
+                print(f"try일경우{model_response}")
         except (ValueError, SyntaxError) as e:
             print(e)
             model_response = {"answer": model_response}
+            print("예외일경우 :",model_response)
 
         model_answer = model_response.get('answer')
         user_invest_type = model_response.get('user_invest_type')
         answer_confidence = model_response.get('confidence')
-
+        print(model_answer,user_invest_type,answer_confidence)
         use_gpt = evaluate_response(model_answer, KEYWORDS) or answer_confidence < 0.4
-
+        print(use_gpt)
         if use_gpt:
             # GPT Model
             gpt_model = get_gpt_model()
@@ -126,12 +134,14 @@ def delete_chatroom():
         db_connector = ChatDBConnector()
         try:
             db_connector.delete_chatroom(chatroom_id)
-            session_manager.delete_session(user_id, chatroom_id)
+            # session_manager.delete_session(user_id, chatroom_id)
             return jsonify({"message": "채팅방 삭제 완료", "chatroom_id": chatroom_id})
+        except Exception as e:
+            return jsonify({"error": f"채팅방 삭제 중 오류 발생: {str(e)}"}), 500
         finally:
             db_connector.close()
     except Exception as e:
-        return jsonify({"error": f"채팅방 삭제 중 오류 발생: {str(e)}"}), 500
+        return jsonify({"error": f"서버 오류 발생: {str(e)}"}), 500
 
 
 @chat_bp.route("/history", methods=["GET"])

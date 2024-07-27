@@ -29,24 +29,24 @@ class SessionManager:
             self.initialize_model()
         return self.llama_model
 
-    def end_session(self, user_id, chatroom_id):
-        logger.debug(f"Ending session for user_id: {user_id}, chatroom_id: {chatroom_id}")
-        if self.llama_model:
-            try:
-                # logger.debug("Attempting to save model state")
-                # self.async_save_model_state(user_id, chatroom_id)  # 비동기 저장 호출
-                # logger.debug("Model state save initiated")
-                pass
-            except Exception as e:
-                logger.error(f"Error saving model state: {str(e)}")
+    # def end_session(self, user_id, chatroom_id):
+    #     logger.debug(f"Ending session for user_id: {user_id}, chatroom_id: {chatroom_id}")
+    #     if self.llama_model:
+    #         try:
+    #             # logger.debug("Attempting to save model state")
+    #             # self.async_save_model_state(user_id, chatroom_id)  # 비동기 저장 호출
+    #             # logger.debug("Model state save initiated")
+    #             pass
+    #         except Exception as e:
+    #             logger.error(f"Error saving model state: {str(e)}")
 
-    # def delete_session(self, user_id, chatroom_id):
-    #     logger.debug(f"Deleting session for user_id: {user_id}, chatroom_id: {chatroom_id}")
-    #     try:
-    #         delete_model_state(user_id, chatroom_id)
-    #         logger.debug("Model state deleted.")
-    #     except Exception as e:
-    #         logger.error(f"Error deleting model state: {str(e)}")
+    def delete_session(self, user_id, chatroom_id):
+        logger.debug(f"Deleting session for user_id: {user_id}, chatroom_id: {chatroom_id}")
+        try:
+            delete_model_state(user_id, chatroom_id)
+            logger.debug("Model state deleted.")
+        except Exception as e:
+            logger.error(f"Error deleting model state: {str(e)}")
 
 
 session_manager = SessionManager.get_instance()  # Global Instance

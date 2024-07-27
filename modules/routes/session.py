@@ -87,51 +87,5 @@ def logout():
     return jsonify({"message": "로그아웃 및 모든 세션 종료 완료", "user_id": user_id})
 
 
-@session_bp.route("/delete-chatroom", methods=["POST"])
-def delete_chatroom():
-    data = request.json
-    chatroom_id = data.get("chatroom_id")
-    user_id = data.get("userid")
-
-    if not chatroom_id or not user_id:
-        return jsonify({"error": "채팅방 ID와 유저 ID가 제공되지 않았습니다."}), 400
-
-    db_connector = DBConnector()
-    try:
-        # 모델 상태 삭제
-        session_manager.delete_session(user_id, chatroom_id)
-
-        # 채팅방 삭제
-        db_connector.delete_chatroom(chatroom_id)
-    finally:
-        db_connector.close()
-
-    return jsonify({"message": "채팅방 삭제 완료", "chatroom_id": chatroom_id})
 
 
-@session_bp.route("/create-chatroom", methods=["POST"])
-def create_chatroom():
-    data = request.json
-    userid = data.get("userid")
-
-    if not userid:
-        return jsonify({"error": "유저 ID가 제공되지 않았습니다."}), 400
-
-    db_connector = DBConnector()
-    try:
-        # 유저의 채팅룸 개수 확인
-        chatroom_count = db_connector.get_chatroom_count_by_userid(userid)
-        if chatroom_count >= 3:
-            return (
-                jsonify({"error": "한 유저당 최대 3개의 채팅룸만 생성할 수 있습니다."}),
-                400,
-            )
-
-        # 새로운 채팅방 생성
-        chatroom_id = db_connector.create_chatroom(userid)
-    finally:
-        db_connector.close()
-
-    return jsonify(
-        {"message": "채팅방 생성 완료", "chatroom_id": chatroom_id, "userid": userid}
-    )
