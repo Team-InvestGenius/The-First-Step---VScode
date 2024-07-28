@@ -46,7 +46,7 @@ if __name__ == "__main__":
     r1_result = retrieve_selected_stocks(r, symbol_mapper)
     r1_result['n_of_strategies'] = n_of_strategies   # 검토한 전략의 수
     r1_result['national'] = national.upper()         # 투자 국가
-    r1_result['trading_preferences'] = "공격투자형"    # 투자 유형
+    r1_result['invest_type'] = "공격투자형"          # 투자 유형
 
     print(r1_result)
     
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     r2_result = retrieve_selected_stocks(r2, symbol_mapper)
     r2_result['n_of_strategies'] = n_of_strategies   # 검토한 전략의 수
     r2_result['national'] = national.upper()         # 투자 국가
-    r2_result['trading_preferences'] = "방어투자형"    # 투자 유형
+    r2_result['invest_type'] = "방어투자형"           # 투자 유형
 
     db = StrategyDBConnector()
     db.insert_strategy_result(r2_result)
@@ -76,7 +76,7 @@ if __name__ == "__main__":
     r3_result = retrieve_selected_stocks(r3, symbol_mapper)
     r3_result['n_of_strategies'] = n_of_strategies   # 검토한 전략의 수
     r3_result['national'] = national.upper()         # 투자 국가
-    r3_result['trading_preferences'] = "중립투자형"    # 투자 유형
+    r3_result['invest_type'] = "중립투자형"           # 투자 유형
 
     db = StrategyDBConnector()
     db.insert_strategy_result(r3_result)

@@ -1,12 +1,6 @@
 import sys
 import os
 import pymysql
-
-# 현재 파일의 상위 디렉토리를 모듈 경로에 추가
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.append(parent_dir)
-
 from db_connector import DBConnector
 import json
 
@@ -65,6 +59,7 @@ class StrategyDBConnector(DBConnector):
                 columns = ", ".join(data.keys())
                 values = ", ".join(["%s"] * len(data))
                 sql = f"INSERT INTO Strategy_pool ({columns}) VALUES ({values})"
+                print(f"Executing SQL: {sql}")
                 cursor.execute(sql, tuple(data.values()))
                 self.connection.commit()
         except pymysql.MySQLError as e:

@@ -12,6 +12,8 @@ class DBConnector(ABC):
             db=db_config['database'],
             port=db_config['port'],
             cursorclass=pymysql.cursors.DictCursor,
+            # 다음 줄을 추가하여 쿼리 로그를 활성화합니다.
+            client_flag=pymysql.constants.CLIENT.MULTI_STATEMENTS
         )
 
     def execute_query(self, query, params=None):
