@@ -365,6 +365,12 @@ def prepare_data(dp_result: List) -> pd.DataFrame:
             aggregated_data.append(close_price)
             logger.info(f"{k}: shape {close_price.shape}")
 
+    # 중복된 인덱스를 제거합니다.
+    for i, data in enumerate(aggregated_data):
+        if data.index.duplicated().any():
+            logger.warning(f"중복된 인덱스를 제거합니다: {data.name}")
+            aggregated_data[i] = data[~data.index.duplicated(keep='first')]
+
     all_data = pd.concat(aggregated_data, axis=1)
 
     if not isinstance(all_data.index, pd.DatetimeIndex):
@@ -374,6 +380,7 @@ def prepare_data(dp_result: List) -> pd.DataFrame:
     all_data = all_data.resample("1D").last().bfill().ffill()
     all_data = all_data.sort_index()
     return all_data
+
 
 
 def create_symbol_mapper(configs: List[Dict]) -> Dict[str, str]:

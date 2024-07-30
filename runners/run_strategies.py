@@ -6,15 +6,25 @@ import logging
 # 현재 파일의 상위 디렉토리 경로 설정
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
+
+# 프로젝트 루트 및 모듈 경로 추가
 sys.path.append(project_root)
 sys.path.append(os.path.join(project_root, 'modules'))
 sys.path.append(os.path.join(project_root, 'modules', 'db'))
 
-from modules.utils import read_config, create_strategy, create_symbol_mapper
-from modules.strategy.strategy_pool import StrategyPool
-from modules.strategy.utils import retrieve_selected_stocks
-from modules.logger import get_logger, setup_global_logging
-from modules.db.strategy_pool_db import StrategyDBConnector
+# sys.path 확인 (디버깅 용도)
+print("sys.path:", sys.path)
+
+# 모듈 불러오기 테스트
+try:
+    from modules.utils import read_config, create_strategy, create_symbol_mapper
+    from modules.strategy.utils import retrieve_selected_stocks
+    from modules.strategy.strategy_pool import StrategyPool
+    from modules.logger import get_logger, setup_global_logging
+    from modules.db.strategy_pool_db import StrategyDBConnector
+    print("Modules imported successfully!")
+except ImportError as e:
+    print(f"Error importing modules: {e}")
 
 # 로거 설정
 logger = get_logger(__name__)

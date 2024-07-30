@@ -1,7 +1,7 @@
 import sys
 import os
 import pymysql
-from db_connector import DBConnector
+from modules.db.db_connector import DBConnector
 import json
 
 class StrategyDBConnector(DBConnector):

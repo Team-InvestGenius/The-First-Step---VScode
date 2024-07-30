@@ -27,6 +27,11 @@ if __name__ == "__main__":
     )
 
     # config 파일 읽기
-    config = read_config(config_path)
+    try:
+        config = read_config(config_path)
+    except FileNotFoundError as e:
+        logger.error(f"Config file not found: {config_path}")
+        sys.exit(1)
+
     run_data_pipeline(config)
     logger.info("Script completed")
