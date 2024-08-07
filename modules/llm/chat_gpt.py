@@ -77,15 +77,18 @@ class GPTModel:
         except Exception as e:
             raise RuntimeError(f"Fine-tuned 모델 목록 조회 오류: {str(e)}")
 
-    def generate_with_history(self, messages: List[Dict[str, str]]) -> str:
+    def generate_with_history(self, messages: List[Dict[str, str]], include_prompt: bool = True) -> str:
         try:
+            if include_prompt:
+                messages.insert(0, {"role": "system", "content": GPT_PROMPT})  # 항상 프롬프트를 대화 시작에 추가
             response = self.client.chat.completions.create(
                 model=self.model_id,
-                messages=[{"role": "system", "content": GPT_PROMPT}] + messages
+                messages=messages
             )
             return response.choices[0].message.content
         except Exception as e:
             raise RuntimeError(f"텍스트 생성 오류: {str(e)}")
+
 
     def generate_with_fine_tuned_model(self, instruction: str, fine_tuned_model_id: str) -> str:
         """
@@ -126,14 +129,3 @@ class GPTModel:
             return response.choices[0].message.content
         except Exception as e:
             raise RuntimeError(f"텍스트 생성 오류: {str(e)}")
-
-# if __name__ == "__main__":
-#     api_key = os.environ.get("OPENAI_API_KEY")
-#     if not api_key:
-#         raise ValueError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
-#
-#     gpt_model = GPTModel(api_key=api_key, model_id="gpt-3.5-turbo-0125")
-#     fine_tune_jobs = gpt_model.list_fine_tune_jobs(20)
-#     for job in fine_tune_jobs:
-#         print(f"Job ID: {job['id']}, Status: {job['status']}")
-

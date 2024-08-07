@@ -1,3 +1,4 @@
+import pymysql
 from modules.db.db_connector import DBConnector
 
 
@@ -61,3 +62,17 @@ class ChatDBConnector(DBConnector):
     def delete_chatroom(self, chatroom_id):
         query = "DELETE FROM chat_rooms WHERE chatroom_id = %s"
         self.execute_query(query, (chatroom_id,))
+
+    def update_user_invest_type(self, user_id, investment_type):
+        cursor = None
+        try:
+            cursor = self.connection.cursor(pymysql.cursors.DictCursor)
+            update_sql = "UPDATE users SET investment_type = %s WHERE user_id = %s"
+            cursor.execute(update_sql, (investment_type, user_id))
+            self.connection.commit()
+        except pymysql.MySQLError as e:
+            print(f"Error updating user invest type: {e}")
+            self.connection.rollback()
+        finally:
+            if cursor:
+                cursor.close()

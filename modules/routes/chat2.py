@@ -26,7 +26,7 @@ def parse_model_response(response):
         else:
             raise ValueError("Unexpected response type")
 
-        required_fields = ['answer', 'confidence', 'user_invest_type', 'strategy_request']
+        required_fields = ['answer', 'user_invest_type', 'confidence', 'strategy_request']
         for field in required_fields:
             if field not in parsed_response:
                 raise KeyError(f"Missing required field: {field}")
@@ -37,16 +37,18 @@ def parse_model_response(response):
         error = {
             "error_type": type(e).__name__,
             "error_message": str(e),
-            "original_response": response if isinstance(response, str) else json.dumps(response)
+            "original_response": response if isinstance(response, str) else str(response)
         }
         # JSON 형식을 따르지 않는 경우 기본값으로 설정된 JSON 형식을 반환
         default_response = {
             "answer": response if isinstance(response, str) else json.dumps(response),
             "confidence": 0,
-            "user_invest_type": "Null",
+            "user_invest_type": "None",
             "strategy_request": 0
         }
         return default_response, error
+
+
 
 @chat_bp.route("/ask", methods=["POST"])
 def ask_question():
@@ -76,57 +78,62 @@ def ask_question():
 
         current_app.logger.info(f"DB에서 히스토리 가져오기: {chat_history}")
 
-        gpt_model = get_gpt_model()
-        current_app.logger.info(f"GPT 모델 초기화 완료: {gpt_model}")
-        
-        if chat_history:
+        if chat_history is None or len(chat_history) == 0:
+            model_response = llama_model.generate_response(question)
+            current_app.logger.info(f"새로운 대화시 답변: {model_response}")
+        else:
             chat_history = format_recent_chat_history(chat_history, n=3)
             current_app.logger.info(f"기존 대화 존재시 히스토리: {chat_history}")
+            model_response = llama_model.generate_response_with_history(question, chat_history)
 
-        if chat_history:
-            chat_history.append({"role": "user", "content": question})
-            gpt_response = gpt_model.generate_with_history(chat_history, include_prompt=True)
-        else:
-            gpt_response = gpt_model.generate(question)
+        current_app.logger.info(f"라마모델 응답: {model_response}")
 
-        current_app.logger.info(f"GPT 모델 응답: {gpt_response}")
+        try:
+            model_response, error = parse_model_response(model_response)
+            if error:
+                current_app.logger.error(f"라마모델 response parsing error: {error}")
+                model_response = {
+                    "answer": model_response if isinstance(model_response, str) else json.dumps(model_response),
+                    "user_invest_type": "None",
+                    "confidence": 0,
+                    "strategy_request": 0
+                }
 
-        gpt_response, error = parse_model_response(gpt_response)
-        current_app.logger.info(f"gpt모델 응답 파싱: {gpt_response}, 오류: {error}")
-        if gpt_response["confidence"] < 0:
-            current_app.logger.error(f"GPT 응답 파싱 오류 또는 확신도 낮음: {error}")
-            gpt_response = {
-                "answer": gpt_response if isinstance(gpt_response, str) else json.dumps(gpt_response),
-                "user_invest_type": "None",
-                "confidence": 0,
-                "strategy_request": 0
-            }
+            model_answer = model_response["answer"]
+            user_invest_type = model_response["user_invest_type"]
+            answer_confidence = model_response["confidence"]
+            is_portfolio = model_response["strategy_request"]
 
-            model_response = llama_model.generate_response_with_history(question, chat_history) if chat_history else llama_model.generate_response(question)
-            current_app.logger.info(f"라마모델 응답: {model_response}")
+            current_app.logger.info(f"라마모델 답변: {model_answer}, 투자 유형: {user_invest_type}, 확신도: {answer_confidence}, 추천원하는정도 : {is_portfolio}")
 
-            try:
-                model_response, error = parse_model_response(model_response)
-                if error:
-                    current_app.logger.error(f"라마모델 response parsing error: {error}")
-                    model_response = {
-                        "answer": model_response if isinstance(model_response, str) else json.dumps(model_response),
-                        "user_invest_type": "None",
-                        "confidence": 0,
-                        "strategy_request": 0
-                    }
+        except Exception as e:
+            current_app.logger.error(f"오류 발생 parse_model_response: {str(e)}")
+            return jsonify({"error": "내부 서버 오류가 발생했습니다."}), 500
 
-                model_answer = model_response["answer"]
-                user_invest_type = model_response["user_invest_type"]
-                answer_confidence = model_response["confidence"]
-                is_portfolio = model_response["strategy_request"]
+        use_gpt = evaluate_response(question) or answer_confidence < 0.4
+        current_app.logger.info(f"gpt 사용 여부: {use_gpt}")
+        if use_gpt:
+            gpt_model = get_gpt_model()
+            current_app.logger.info(f"GPT 모델 초기화 완료: {gpt_model}")
+            if chat_history:
+                chat_history.extend([{"role": "user", "content": question}])
+                gpt_response = gpt_model.generate_with_history(chat_history, include_prompt=False)  # 프롬프트를 포함하지 않음
+            else:
+                gpt_response = gpt_model.generate(question)
+            
+            current_app.logger.info(f"GPT 모델 응답: {gpt_response}")
 
-                current_app.logger.info(f"라마모델 답변: {model_answer}, 투자 유형: {user_invest_type}, 확신도: {answer_confidence}, 추천원하는정도 : {is_portfolio}")
+            gpt_response, error = parse_model_response(gpt_response)
+            current_app.logger.info(f"gpt모델 응답 파싱: {gpt_response}, 오류: {error}")
+            if error:
+                current_app.logger.error(f"GPT 응답 파싱 오류: {error}")
+                gpt_response = {
+                    "answer": gpt_response if isinstance(gpt_response, str) else json.dumps(gpt_response),
+                    "user_invest_type": "None",
+                    "confidence": 0,
+                    "strategy_request": 0
+                }
 
-            except Exception as e:
-                current_app.logger.error(f"오류 발생 parse_model_response: {str(e)}")
-                return jsonify({"error": "내부 서버 오류가 발생했습니다."}), 500
-        else:
             model_answer = gpt_response["answer"]
             user_invest_type = gpt_response["user_invest_type"]
             answer_confidence = gpt_response["confidence"]
@@ -136,9 +143,9 @@ def ask_question():
 
         # 유저투자유형 insert or update
         db_connector.update_user_invest_type(user_id, user_invest_type)
-        
+        print(is_portfolio)
         strategy = None
-        if is_portfolio_request(question):
+        if is_portfolio > 0.6:
             strategy_db_connector = StrategyDBConnector()
             strategy = strategy_db_connector.get_best_strategy(user_invest_type)
             if strategy:
@@ -163,7 +170,7 @@ def ask_question():
                 model_answer = strategy_message
 
         db_connector.save_chat_history(room_id, "user", question)
-        db_connector.save_chat_history(room_id, "gpt" if answer_confidence >= 0 else "llama", model_answer)
+        db_connector.save_chat_history(room_id, "gpt" if use_gpt else "llama", model_answer)
     
         response = {
             "response": model_answer,
@@ -179,8 +186,6 @@ def ask_question():
         return jsonify({"error": str(e)}), 500
     finally:
         db_connector.close()
-
-
 
 
 
